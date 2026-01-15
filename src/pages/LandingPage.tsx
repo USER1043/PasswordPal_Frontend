@@ -1,5 +1,5 @@
 // ============================================================================
-// src/pages/HomePage.tsx - Enhanced Homepage (Bitwarden-inspired)
+// src/pages/LandingPage.tsx - Enhanced Landingpage (Bitwarden-inspired)
 // ============================================================================
 import {
   Shield,
@@ -17,11 +17,11 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-interface HomePageProps {
+interface LandingPageProps {
   onNavigate: (view: string) => void;
 }
 
-export default function HomePage({ onNavigate }: HomePageProps) {
+export default function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <div className="min-h-screen">
       {/* Hero Section with proper navbar spacing */}

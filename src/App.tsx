@@ -1,8 +1,8 @@
 import { useState } from "react";
 import Navbar from "./components/Navbar";
-import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import LandingPage from "./pages/LandingPage";
 
 export default function App() {
   const [currentView, setCurrentView] = useState("home");
@@ -17,7 +17,7 @@ export default function App() {
       <Navbar onNavigate={handleNavigate} currentView={currentView} />
 
       {/* Page Content */}
-      {currentView === "home" && <HomePage onNavigate={handleNavigate} />}
+      {currentView === "home" && <LandingPage onNavigate={handleNavigate} />}
       {currentView === "login" && <LoginPage onNavigate={handleNavigate} />}
       {currentView === "register" && (
         <RegisterPage onNavigate={handleNavigate} />
