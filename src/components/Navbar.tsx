@@ -1,8 +1,8 @@
 // ============================================================================
 // src/components/Navbar.tsx
 // ============================================================================
-import React, { useState } from 'react';
-import { Shield, Menu, X } from 'lucide-react';
+import { useState } from "react";
+import { Shield, Menu, X } from "lucide-react";
 
 interface NavbarProps {
   onNavigate: (view: string) => void;
@@ -13,10 +13,10 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { name: 'Home', view: 'home' },
-    { name: 'Features', view: 'home', scroll: 'features' },
-    { name: 'Pricing', view: 'home', scroll: 'pricing' },
-    { name: 'Resources', view: 'home', scroll: 'resources' },
+    { name: "Home", view: "home" },
+    { name: "Features", view: "home", scroll: "features" },
+    { name: "Pricing", view: "home", scroll: "pricing" },
+    { name: "Resources", view: "home", scroll: "resources" },
   ];
 
   return (
@@ -25,15 +25,18 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <button
-            onClick={() => onNavigate('home')}
+            onClick={() => onNavigate("home")}
             className="flex items-center gap-2 group"
           >
             <div className="relative">
-              <Shield className="w-8 h-8 text-purple-400 group-hover:text-purple-300 transition-colors" strokeWidth={2} />
+              <Shield
+                className="w-8 h-8 text-purple-400 group-hover:text-purple-300 transition-colors"
+                strokeWidth={2}
+              />
               <div className="absolute inset-0 bg-purple-500 blur-md opacity-20 group-hover:opacity-30 transition-opacity"></div>
             </div>
             <span className="text-xl font-bold text-white group-hover:text-purple-300 transition-colors">
-              SecureVault
+              PasswordPal
             </span>
           </button>
 
@@ -45,8 +48,8 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
                 onClick={() => onNavigate(link.view)}
                 className={`text-sm font-medium transition-colors ${
                   currentView === link.view
-                    ? 'text-purple-400'
-                    : 'text-slate-300 hover:text-white'
+                    ? "text-purple-400"
+                    : "text-slate-300 hover:text-white"
                 }`}
               >
                 {link.name}
@@ -57,13 +60,13 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
             <button
-              onClick={() => onNavigate('login')}
+              onClick={() => onNavigate("login")}
               className="text-slate-300 hover:text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               Log In
             </button>
             <button
-              onClick={() => onNavigate('register')}
+              onClick={() => onNavigate("register")}
               className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all transform hover:scale-105"
             >
               Get Started Free
@@ -97,18 +100,18 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
                 }}
                 className={`block w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   currentView === link.view
-                    ? 'bg-purple-600/20 text-purple-400'
-                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                    ? "bg-purple-600/20 text-purple-400"
+                    : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
                 }`}
               >
                 {link.name}
               </button>
             ))}
-            
+
             <div className="pt-3 border-t border-slate-700/50 space-y-2">
               <button
                 onClick={() => {
-                  onNavigate('login');
+                  onNavigate("login");
                   setMobileMenuOpen(false);
                 }}
                 className="block w-full text-left px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
@@ -117,7 +120,7 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
               </button>
               <button
                 onClick={() => {
-                  onNavigate('register');
+                  onNavigate("register");
                   setMobileMenuOpen(false);
                 }}
                 className="block w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
