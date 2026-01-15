@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import LandingPage from "./pages/LandingPage";
+import VaultPage from "./pages/VaultPage";
 
 export default function App() {
   const [currentView, setCurrentView] = useState("home");
@@ -22,6 +23,7 @@ export default function App() {
       {currentView === "register" && (
         <RegisterPage onNavigate={handleNavigate} />
       )}
+      {currentView === "vault" && <VaultPage onNavigate={handleNavigate} />}
     </div>
   );
 }
