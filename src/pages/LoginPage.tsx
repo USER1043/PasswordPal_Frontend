@@ -1,35 +1,35 @@
 // ============================================================================
 // src/pages/LoginPage.tsx
 // ============================================================================
-import React, { useState } from 'react';
-import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 
 interface LoginPageProps {
   onNavigate: (view: string) => void;
 }
 
 export default function LoginPage({ onNavigate }: LoginPageProps) {
-  const [email, setEmail] = useState('');
-  const [masterPassword, setMasterPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [masterPassword, setMasterPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleLogin = async () => {
     if (!email || !masterPassword) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       // TODO: Implement real authentication with crypto logic
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      alert('Login successful! (Demo - implement real crypto logic)');
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      alert("Login successful! (Demo - implement real crypto logic)");
     } catch (err) {
-      setError('Invalid email or password');
+      setError("Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -46,9 +46,13 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
               <div className="absolute inset-0 bg-purple-500 blur-xl opacity-20"></div>
             </div>
           </div>
-          
-          <h2 className="text-3xl font-bold text-white text-center mb-2">Welcome Back</h2>
-          <p className="text-slate-400 text-center mb-8">Unlock your vault securely</p>
+
+          <h2 className="text-3xl font-bold text-white text-center mb-2">
+            Welcome Back
+          </h2>
+          <p className="text-slate-400 text-center mb-8">
+            Unlock your vault securely
+          </p>
 
           {/* Error Message */}
           {error && (
@@ -79,18 +83,22 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
               </label>
               <div className="relative">
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={masterPassword}
                   onChange={(e) => setMasterPassword(e.target.value)}
                   placeholder="Enter your master password"
-                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3.5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                 />
                 <button
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -123,9 +131,9 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
 
           {/* Sign Up Link */}
           <div className="mt-6 pt-6 border-t border-slate-700/50 text-center text-sm text-slate-400">
-            Don't have an account?{' '}
+            Don't have an account?{" "}
             <button
-              onClick={() => onNavigate('register')}
+              onClick={() => onNavigate("register")}
               className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
             >
               Create one
@@ -138,9 +146,12 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
           <div className="flex items-start gap-4">
             <Shield className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="text-slate-200 font-semibold mb-1">Zero-Knowledge Security</p>
+              <p className="text-slate-200 font-semibold mb-1">
+                Zero-Knowledge Security
+              </p>
               <p className="text-slate-400 leading-relaxed">
-                Your master password is never sent to our servers. All encryption happens locally on your device.
+                Your master password is never sent to our servers. All
+                encryption happens locally on your device.
               </p>
             </div>
           </div>
