@@ -28,4 +28,5 @@ engine = "0.0.0"
 base64 = "0.22.1"
 rand_core = "0.9.5"
 zeroize = "1.8.2"
+argon2 = "0.5"
 
