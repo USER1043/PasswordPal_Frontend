@@ -28,6 +28,7 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
       // TODO: Implement real authentication with crypto logic
       await new Promise((resolve) => setTimeout(resolve, 1500));
       alert("Login successful! (Demo - implement real crypto logic)");
+      onNavigate("vault");
     } catch (err) {
       setError("Invalid email or password");
     } finally {
