@@ -36,8 +36,14 @@ pub fn unlock_vault_logic(st: &mut VaultState, key_b64: String) -> Result<(), St
 #[tauri::command]
 pub fn lock_vault(state: State<'_, Mutex<VaultState>>) -> Result<(), String> {
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
-    st.lock_and_wipe();
+    lock_vault_logic(&mut st);
     Ok(())
+}
+
+/// Core logic for locking the vault.
+/// Separated for unit testing.
+pub fn lock_vault_logic(st: &mut VaultState) {
+    st.lock_and_wipe();
 }
 
 #[cfg(test)]
@@ -75,5 +81,18 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(result.err().unwrap(), "Key must be exactly 32 bytes");
         assert!(!state.unlocked);
+    }
+
+     #[test]
+    fn test_lock_vault() {
+        // Create a new vault state
+        let mut state = VaultState::default();
+        state.enc_key = Some(vec![0; 32]);
+        state.unlocked = true;
+
+        lock_vault_logic(&mut state);
+        // Check if the vault is locked and the enc key is wiped
+        assert!(!state.unlocked);
+        assert!(state.enc_key.is_none());
     }
 }
