@@ -3,6 +3,7 @@
 // ============================================================================
 import { useState } from "react";
 import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
+import { useNotification } from "../context/NotificationContext";
 
 interface LoginPageProps {
   onNavigate: (view: string) => void;
@@ -10,27 +11,30 @@ interface LoginPageProps {
 
 export default function LoginPage({ onNavigate }: LoginPageProps) {
   const [email, setEmail] = useState("");
-  const [masterPassword, setMasterPassword] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { success, error: notifyError } = useNotification();
 
   const handleLogin = async () => {
-    if (!email || !masterPassword) {
-      setError("Please fill in all fields");
+    if (!email || !password) {
+      notifyError("Please enter email and password");
       return;
     }
 
-    setError("");
     setLoading(true);
 
     try {
-      // TODO: Implement real authentication with crypto logic
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      alert("Login successful! (Demo - implement real crypto logic)");
+      // Simulate API call and crypto verification
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // For demo purposes - in real app this would verify against stored hash
+      // const isValid = await verifyPassword(password, storedHash, storedSalt);
+
+      success("Welcome back! Your vault is unlocked.");
       onNavigate("vault");
     } catch (err) {
-      setError("Invalid email or password");
+      notifyError("Invalid credentials");
     } finally {
       setLoading(false);
     }
@@ -55,14 +59,6 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
             Unlock your vault securely
           </p>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-center gap-3 animate-shake">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <span className="text-red-400 text-sm">{error}</span>
-            </div>
-          )}
-
           {/* Form Fields */}
           <div className="space-y-5">
             <div>
@@ -85,8 +81,8 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  value={masterPassword}
-                  onChange={(e) => setMasterPassword(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your master password"
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3.5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
@@ -148,11 +144,11 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
             <Shield className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
               <p className="text-slate-200 font-semibold mb-1">
-                Zero-Knowledge Security
+                Your Privacy is Protected
               </p>
               <p className="text-slate-400 leading-relaxed">
-                Your master password is never sent to our servers. All
-                encryption happens locally on your device.
+                Your master password never leaves your device. All
+                encryption happens locally for maximum security.
               </p>
             </div>
           </div>

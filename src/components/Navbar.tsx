@@ -13,10 +13,11 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { name: "Home", view: "home" },
     { name: "Features", view: "home", scroll: "features" },
-    { name: "Pricing", view: "home", scroll: "pricing" },
-    { name: "Resources", view: "home", scroll: "resources" },
+    { name: "Security", view: "home", scroll: "security" },
+    { name: "Download", view: "home", scroll: "download" },
+    { name: "Help", view: "home", scroll: "help" },
+    { name: "About", view: "home", scroll: "about" },
   ];
 
   return (
@@ -46,11 +47,10 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
               <button
                 key={link.name}
                 onClick={() => onNavigate(link.view)}
-                className={`text-sm font-medium transition-colors ${
-                  currentView === link.view
+                className={`text-sm font-medium transition-colors ${currentView === link.view
                     ? "text-purple-400"
                     : "text-slate-300 hover:text-white"
-                }`}
+                  }`}
               >
                 {link.name}
               </button>
@@ -98,11 +98,10 @@ export default function Navbar({ onNavigate, currentView }: NavbarProps) {
                   onNavigate(link.view);
                   setMobileMenuOpen(false);
                 }}
-                className={`block w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  currentView === link.view
+                className={`block w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentView === link.view
                     ? "bg-purple-600/20 text-purple-400"
                     : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
-                }`}
+                  }`}
               >
                 {link.name}
               </button>
