@@ -36,6 +36,9 @@ export default function AddPasswordModal({
     );
     const [showPassword, setShowPassword] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState(0);
+    const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+    const [newFolderName, setNewFolderName] = useState("");
+    const [customFolders, setCustomFolders] = useState<string[]>([]);
 
     if (!isOpen) return null;
 
@@ -66,6 +69,16 @@ export default function AddPasswordModal({
     const handlePasswordChange = (pwd: string) => {
         setFormData({ ...formData, password: pwd });
         calculateStrength(pwd);
+    };
+
+    const handleCreateFolder = () => {
+        if (newFolderName.trim() && !customFolders.includes(newFolderName.trim())) {
+            const folderName = newFolderName.trim();
+            setCustomFolders([...customFolders, folderName]);
+            setFormData({ ...formData, folder: folderName });
+            setNewFolderName("");
+            setShowNewFolderInput(false);
+        }
     };
 
     const handleSubmit = () => {
@@ -181,10 +194,10 @@ export default function AddPasswordModal({
                                     <span className="text-slate-400">Password Strength</span>
                                     <span
                                         className={`font-semibold ${passwordStrength < 40
-                                                ? "text-red-400"
-                                                : passwordStrength < 70
-                                                    ? "text-yellow-400"
-                                                    : "text-green-400"
+                                            ? "text-red-400"
+                                            : passwordStrength < 70
+                                                ? "text-yellow-400"
+                                                : "text-green-400"
                                             }`}
                                     >
                                         {getStrengthLabel()}
@@ -219,19 +232,65 @@ export default function AddPasswordModal({
                         <label className="block text-sm font-medium text-slate-300 mb-2">
                             Folder
                         </label>
-                        <select
-                            value={formData.folder}
-                            onChange={(e) =>
-                                setFormData({ ...formData, folder: e.target.value })
-                            }
-                            className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                        >
-                            <option value="">No Folder</option>
-                            <option value="Personal">Personal</option>
-                            <option value="Work">Work</option>
-                            <option value="Finance">Finance</option>
-                            <option value="Social">Social</option>
-                        </select>
+                        {!showNewFolderInput ? (
+                            <div className="space-y-2">
+                                <select
+                                    value={formData.folder}
+                                    onChange={(e) => {
+                                        if (e.target.value === "__create_new__") {
+                                            setShowNewFolderInput(true);
+                                        } else {
+                                            setFormData({ ...formData, folder: e.target.value });
+                                        }
+                                    }}
+                                    className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                >
+                                    <option value="" className="bg-slate-800 text-slate-300">No Folder</option>
+                                    <option value="Personal" className="bg-slate-800 text-white">📁 Personal</option>
+                                    <option value="Work" className="bg-slate-800 text-white">💼 Work</option>
+                                    <option value="Finance" className="bg-slate-800 text-white">💰 Finance</option>
+                                    <option value="Social" className="bg-slate-800 text-white">🌐 Social</option>
+                                    {customFolders.map((folder) => (
+                                        <option key={folder} value={folder} className="bg-slate-800 text-white">
+                                            📂 {folder}
+                                        </option>
+                                    ))}
+                                    <option value="__create_new__" className="bg-purple-900/30 text-purple-300 font-semibold">
+                                        ➕ Create New Folder
+                                    </option>
+                                </select>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newFolderName}
+                                        onChange={(e) => setNewFolderName(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+                                        placeholder="Enter folder name"
+                                        className="flex-1 bg-slate-900/50 border border-purple-500 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={handleCreateFolder}
+                                        className="px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors font-semibold"
+                                    >
+                                        Create
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowNewFolderInput(false);
+                                            setNewFolderName("");
+                                        }}
+                                        className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-400">Press Enter or click Create to add the folder</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Notes */}

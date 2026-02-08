@@ -2,7 +2,6 @@ import {
     Shield,
     Lock,
     Zap,
-    LayoutDashboard,
     Settings,
     LogOut,
     Plus
@@ -11,9 +10,10 @@ import {
 interface SidebarProps {
     currentView: string;
     onNavigate: (view: string) => void;
+    onAddPassword: () => void;
 }
 
-export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
+export default function Sidebar({ currentView, onNavigate, onAddPassword }: SidebarProps) {
     const menuItems = [
         { id: "vault", label: "My Vault", icon: Lock },
         { id: "generator", label: "Generator", icon: Zap },
@@ -37,10 +37,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
             {/* Main Navigation */}
             <div className="flex-1 px-4 py-4 space-y-2">
                 <button
-                    onClick={() => {
-                        // Logic to open add modal could go here, or simple navigation
-                        onNavigate("vault");
-                    }}
+                    onClick={onAddPassword}
                     className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white p-3 rounded-xl font-semibold transition-all shadow-lg shadow-purple-900/20 mb-6 flex items-center justify-center gap-2 group"
                 >
                     <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
@@ -56,14 +53,14 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
                             key={item.id}
                             onClick={() => onNavigate(item.id)}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${currentView === item.id
-                                    ? "bg-purple-500/10 text-purple-300 border border-purple-500/20"
-                                    : "text-slate-400 hover:bg-slate-700/50 hover:text-white border border-transparent"
+                                ? "bg-purple-500/10 text-purple-300 border border-purple-500/20"
+                                : "text-slate-400 hover:bg-slate-700/50 hover:text-white border border-transparent"
                                 }`}
                         >
                             <item.icon
                                 className={`w-5 h-5 transition-colors ${currentView === item.id
-                                        ? "text-purple-400"
-                                        : "text-slate-500 group-hover:text-slate-300"
+                                    ? "text-purple-400"
+                                    : "text-slate-500 group-hover:text-slate-300"
                                     }`}
                             />
                             <span className="font-medium">{item.label}</span>
@@ -78,7 +75,10 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
             {/* User Footer */}
             <div className="p-4 border-t border-slate-700/50">
                 <button
-                    onClick={() => onNavigate("login")} // In real app, this would trigger logout logic
+                    onClick={() => {
+                        // TODO: Call Tauri lock_vault command here
+                        onNavigate("login");
+                    }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-colors group"
                 >
                     <LogOut className="w-5 h-5 group-hover:text-red-400 transition-colors" />

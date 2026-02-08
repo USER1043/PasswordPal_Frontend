@@ -24,8 +24,18 @@ export default function App() {
 
   // Wrapper component to handle notifications dependent on context
   const AppContent = () => {
+    const [showAddPasswordModal, setShowAddPasswordModal] = useState(false);
+
     const handleNavigate = (view: string) => {
       setCurrentView(view);
+    };
+
+    const handleAddPassword = () => {
+      // Ensure we're on the vault page and open the modal
+      if (currentView !== "vault") {
+        setCurrentView("vault");
+      }
+      setShowAddPasswordModal(true);
     };
 
     // Views that are part of the "Authenticated App"
@@ -41,8 +51,14 @@ export default function App() {
             {currentView === "register" && <RegisterPage onNavigate={handleNavigate} />}
           </>
         ) : (
-          <AppLayout currentView={currentView} onNavigate={handleNavigate}>
-            {currentView === "vault" && <VaultPage onNavigate={handleNavigate} />}
+          <AppLayout currentView={currentView} onNavigate={handleNavigate} onAddPassword={handleAddPassword}>
+            {currentView === "vault" && (
+              <VaultPage
+                onNavigate={handleNavigate}
+                showAddModal={showAddPasswordModal}
+                setShowAddModal={setShowAddPasswordModal}
+              />
+            )}
             {currentView === "security" && <SecurityDashboardPage onNavigate={handleNavigate} />}
             {currentView === "generator" && <PasswordGeneratorPage onNavigate={handleNavigate} />}
             {currentView === "settings" && <SettingsPage onNavigate={handleNavigate} />}

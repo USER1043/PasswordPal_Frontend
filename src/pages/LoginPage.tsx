@@ -2,7 +2,7 @@
 // src/pages/LoginPage.tsx
 // ============================================================================
 import { useState } from "react";
-import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
+import { Shield, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
 
 interface LoginPageProps {
@@ -116,13 +116,6 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
                   <span>Unlock Vault</span>
                 </>
               )}
-            </button>
-          </div>
-
-          {/* Forgot Password Link */}
-          <div className="mt-6 text-center">
-            <button className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors">
-              Forgot master password?
             </button>
           </div>
 

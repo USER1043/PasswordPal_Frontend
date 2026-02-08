@@ -32,10 +32,10 @@ export default function SecurityDashboardPage({
     // Mock data - replace with real security analysis
     const securityScore = 78;
     const totalPasswords = 45;
-    const weakPasswords = 8;
-    const reusedPasswords = 5;
-    const oldPasswords = 12;
-    const breachedPasswords = 2;
+    const weakPasswords = 1;
+    const reusedPasswords = 1;
+    const oldPasswords = 1;
+    const breachedPasswords = 1;
 
     const passwordIssues: PasswordIssue[] = [
         {

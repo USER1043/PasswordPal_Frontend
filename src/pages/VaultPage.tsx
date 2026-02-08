@@ -4,9 +4,7 @@ import {
   Plus,
   Shield,
   Settings,
-  Lock,
   AlertTriangle,
-  TrendingUp,
   LayoutGrid,
   List,
   ChevronRight,
@@ -16,13 +14,14 @@ import AddPasswordModal, { type PasswordData } from "../components/AddPasswordMo
 
 interface VaultPageProps {
   onNavigate: (view: string) => void;
+  showAddModal: boolean;
+  setShowAddModal: (show: boolean) => void;
 }
 
-export default function VaultPage({ onNavigate }: VaultPageProps) {
+export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }: VaultPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFolder, setSelectedFolder] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [showAddModal, setShowAddModal] = useState(false);
   const [editingPassword, setEditingPassword] = useState<PasswordData | null>(
     null
   );
@@ -146,15 +145,6 @@ export default function VaultPage({ onNavigate }: VaultPageProps) {
               >
                 <Settings className="w-5 h-5" />
               </button>
-              <button
-                onClick={() => {
-                  /* Lock vault */
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg transition-colors"
-              >
-                <Lock className="w-4 h-4" />
-                Lock Vault
-              </button>
             </div>
           </div>
         </div>
@@ -225,16 +215,8 @@ export default function VaultPage({ onNavigate }: VaultPageProps) {
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
                   <span className="text-sm">Security Dashboard</span>
                   <span className="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
-                    8
+                    4
                   </span>
-                </button>
-                <button
-                  onClick={() => onNavigate("security")}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-300 hover:bg-slate-700/50 rounded-xl transition-all"
-                >
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                  <span className="text-sm">Security Report</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
                 </button>
               </div>
             </div>
@@ -262,7 +244,7 @@ export default function VaultPage({ onNavigate }: VaultPageProps) {
                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                     : "bg-slate-800/50 text-slate-400 hover:text-white border border-slate-700/50"
                     }`}
-                  title="List view"
+                  title="List view - View passwords in a detailed list"
                 >
                   <List className="w-5 h-5" />
                 </button>
@@ -272,7 +254,7 @@ export default function VaultPage({ onNavigate }: VaultPageProps) {
                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                     : "bg-slate-800/50 text-slate-400 hover:text-white border border-slate-700/50"
                     }`}
-                  title="Grid view"
+                  title="Grid view - View passwords in a compact grid"
                 >
                   <LayoutGrid className="w-5 h-5" />
                 </button>

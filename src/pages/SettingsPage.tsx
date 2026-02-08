@@ -1,14 +1,10 @@
 import {
     Shield,
     User,
-    Lock,
     Smartphone,
     Download,
     Upload,
     Bell,
-    Eye,
-    Clock,
-    Key,
     AlertTriangle,
     ChevronRight,
     LogOut,
@@ -22,9 +18,6 @@ interface SettingsPageProps {
 
 export default function SettingsPage({ onNavigate }: SettingsPageProps) {
     const [activeTab, setActiveTab] = useState("account");
-    const [autoLockTime, setAutoLockTime] = useState("15");
-    const [clipboardClear, setClipboardClear] = useState("30");
-    const [biometricsEnabled, setBiometricsEnabled] = useState(false);
 
     const tabs = [
         { id: "account", label: "Account", icon: User },
@@ -64,8 +57,8 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id
-                                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                                                : "text-slate-300 hover:bg-slate-700/50"
+                                            ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                            : "text-slate-300 hover:bg-slate-700/50"
                                             }`}
                                     >
                                         <tab.icon className="w-5 h-5" />
@@ -77,7 +70,13 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
 
                             {/* Danger Zone */}
                             <div className="mt-6 pt-6 border-t border-slate-700/50">
-                                <button className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
+                                <button
+                                    onClick={() => {
+                                        // TODO: Call Tauri lock_vault command here
+                                        onNavigate("login");
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+                                >
                                     <LogOut className="w-5 h-5" />
                                     <span className="font-medium">Sign Out</span>
                                 </button>
@@ -217,79 +216,24 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
                                         </button>
                                     </div>
 
-                                    {/* Biometric Unlock */}
-                                    <div className="p-6 bg-slate-900/50 border border-slate-700/50 rounded-xl">
-                                        <div className="flex items-center justify-between">
+                                    {/* Security Settings Info */}
+                                    <div className="p-6 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                                        <div className="flex items-start gap-4">
+                                            <Shield className="w-6 h-6 text-purple-400 flex-shrink-0 mt-1" />
                                             <div>
-                                                <h3 className="text-white font-semibold mb-1">
-                                                    Biometric Unlock
+                                                <h3 className="text-white font-semibold mb-2">
+                                                    Automatic Security Settings
                                                 </h3>
-                                                <p className="text-slate-400 text-sm">
-                                                    Use fingerprint or face recognition
-                                                </p>
+                                                <div className="space-y-2 text-sm text-slate-300">
+                                                    <p>
+                                                        <span className="font-medium text-purple-300">Auto-Lock:</span> Your vault automatically locks after 15 minutes of inactivity or when the application loses focus.
+                                                    </p>
+                                                    <p>
+                                                        <span className="font-medium text-purple-300">Clipboard Security:</span> Copied passwords are automatically cleared from your clipboard after 30 seconds.
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={biometricsEnabled}
-                                                    onChange={(e) => setBiometricsEnabled(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                            </label>
                                         </div>
-                                    </div>
-
-                                    {/* Auto-Lock */}
-                                    <div className="p-6 bg-slate-900/50 border border-slate-700/50 rounded-xl">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <h3 className="text-white font-semibold mb-1">
-                                                    Auto-Lock Timeout
-                                                </h3>
-                                                <p className="text-slate-400 text-sm">
-                                                    Lock vault after inactivity
-                                                </p>
-                                            </div>
-                                            <Clock className="w-5 h-5 text-purple-400" />
-                                        </div>
-                                        <select
-                                            value={autoLockTime}
-                                            onChange={(e) => setAutoLockTime(e.target.value)}
-                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        >
-                                            <option value="1">1 minute</option>
-                                            <option value="5">5 minutes</option>
-                                            <option value="15">15 minutes</option>
-                                            <option value="30">30 minutes</option>
-                                            <option value="60">1 hour</option>
-                                            <option value="never">Never</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Clipboard Clear */}
-                                    <div className="p-6 bg-slate-900/50 border border-slate-700/50 rounded-xl">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <h3 className="text-white font-semibold mb-1">
-                                                    Clear Clipboard
-                                                </h3>
-                                                <p className="text-slate-400 text-sm">
-                                                    Auto-clear copied passwords
-                                                </p>
-                                            </div>
-                                            <Key className="w-5 h-5 text-purple-400" />
-                                        </div>
-                                        <select
-                                            value={clipboardClear}
-                                            onChange={(e) => setClipboardClear(e.target.value)}
-                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        >
-                                            <option value="10">10 seconds</option>
-                                            <option value="30">30 seconds</option>
-                                            <option value="60">1 minute</option>
-                                            <option value="never">Never</option>
-                                        </select>
                                     </div>
                                 </div>
                             )}
@@ -351,7 +295,7 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
                                                     Breach Monitoring
                                                 </h3>
                                                 <p className="text-slate-400 text-sm">
-                                                    Monitor for compromised passwords
+                                                    Check if your passwords appear in known data breaches
                                                 </p>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">
