@@ -1,3 +1,4 @@
+// Password vault page - displays all saved passwords with search and folder filtering
 import { useState } from "react";
 import {
   Search,
@@ -273,7 +274,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
             </div>
 
             {/* Password List */}
-            <div className="space-y-3">
+            <div>
               {filteredPasswords.length === 0 ? (
                 <div className="text-center py-20">
                   <Shield className="w-16 h-16 text-slate-600 mx-auto mb-4" />
@@ -301,20 +302,41 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
                     {filteredPasswords.length} password
                     {filteredPasswords.length !== 1 ? "s" : ""} found
                   </div>
-                  {filteredPasswords.map((pwd) => (
-                    <PasswordItem
-                      key={pwd.id}
-                      id={pwd.id!}
-                      name={pwd.name}
-                      username={pwd.username}
-                      password={pwd.password}
-                      url={pwd.url}
-                      folder={pwd.folder}
-                      lastModified={getRelativeTime()}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
-                  ))}
+                  {viewMode === "list" ? (
+                    <div className="space-y-3">
+                      {filteredPasswords.map((pwd) => (
+                        <PasswordItem
+                          key={pwd.id}
+                          id={pwd.id!}
+                          name={pwd.name}
+                          username={pwd.username}
+                          password={pwd.password}
+                          url={pwd.url}
+                          folder={pwd.folder}
+                          lastModified={getRelativeTime()}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {filteredPasswords.map((pwd) => (
+                        <PasswordItem
+                          key={pwd.id}
+                          id={pwd.id!}
+                          name={pwd.name}
+                          username={pwd.username}
+                          password={pwd.password}
+                          url={pwd.url}
+                          folder={pwd.folder}
+                          lastModified={getRelativeTime()}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>

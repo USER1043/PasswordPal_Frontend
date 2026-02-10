@@ -1,3 +1,4 @@
+// Password generator page - creates strong random passwords with customizable options
 import {
     RefreshCw,
     Copy,

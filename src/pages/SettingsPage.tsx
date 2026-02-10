@@ -1,3 +1,4 @@
+// Settings page - manage account, security, devices, and preferences
 import {
     Shield,
     User,
@@ -10,6 +11,7 @@ import {
     LogOut,
 } from "lucide-react";
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import DeviceManagement from "../components/DeviceManagement";
 
 interface SettingsPageProps {
@@ -71,9 +73,15 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
                             {/* Danger Zone */}
                             <div className="mt-6 pt-6 border-t border-slate-700/50">
                                 <button
-                                    onClick={() => {
-                                        // TODO: Call Tauri lock_vault command here
-                                        onNavigate("login");
+                                    onClick={async () => {
+                                        try {
+                                            await invoke("lock_vault");
+                                            console.log("Vault locked successfully");
+                                        } catch (error) {
+                                            console.error("Failed to lock vault:", error);
+                                        } finally {
+                                            onNavigate("login");
+                                        }
                                     }}
                                     className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
                                 >

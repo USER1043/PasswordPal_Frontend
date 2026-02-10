@@ -1,6 +1,6 @@
+// Individual password card - displays password details with copy, show/hide, edit, and delete actions
 import { Globe, Copy, Eye, EyeOff, MoreVertical, Trash2, Edit } from "lucide-react";
 import { useState } from "react";
-
 interface PasswordItemProps {
     id: string;
     name: string;
@@ -12,7 +12,6 @@ interface PasswordItemProps {
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
 }
-
 export default function PasswordItem({
     id,
     name,

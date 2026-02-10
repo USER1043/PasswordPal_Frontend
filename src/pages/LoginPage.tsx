@@ -2,7 +2,7 @@
 // src/pages/LoginPage.tsx
 // ============================================================================
 import { useState } from "react";
-import { Shield, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Shield, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
 
 interface LoginPageProps {
@@ -41,22 +41,36 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen pt-16 flex items-center justify-center px-4 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="w-full max-w-md">
-        <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-8 shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-center mb-8">
-            <div className="relative">
-              <Shield className="w-16 h-16 text-purple-400" strokeWidth={1.5} />
-              <div className="absolute inset-0 bg-purple-500 blur-xl opacity-20"></div>
-            </div>
-          </div>
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
 
+      <div className="w-full max-w-md relative z-10">
+        {/* Branding Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="relative">
+              <Shield className="w-12 h-12 text-purple-400" strokeWidth={1.5} />
+              <div className="absolute inset-0 bg-purple-500 blur-xl opacity-30"></div>
+            </div>
+            <h1 className="text-2xl font-bold text-white ml-3">PasswordPal</h1>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-purple-300/80 text-sm">
+            <Sparkles className="w-4 h-4" />
+            <span>Secure beyond the vault</span>
+          </div>
+        </div>
+
+        {/* Login Card */}
+        <div className="bg-slate-900/40 backdrop-blur-2xl border border-purple-500/20 rounded-3xl p-8 shadow-2xl shadow-purple-500/10">
           <h2 className="text-3xl font-bold text-white text-center mb-2">
             Welcome Back
           </h2>
           <p className="text-slate-400 text-center mb-8">
-            Unlock your vault securely
+            Unlock your vault with zero-knowledge encryption
           </p>
 
           {/* Form Fields */}
@@ -70,7 +84,7 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                className="w-full bg-slate-950/50 border border-purple-500/30 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:border-purple-500/50"
               />
             </div>
 
@@ -85,11 +99,12 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your master password"
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3.5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="w-full bg-slate-950/50 border border-purple-500/30 rounded-xl px-4 py-3.5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:border-purple-500/50"
                 />
                 <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-300 transition-colors"
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />
@@ -99,35 +114,35 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
                 </button>
               </div>
             </div>
-
-            <button
-              onClick={handleLogin}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:from-purple-600/50 disabled:to-purple-700/50 text-white py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-purple-500/50 transform hover:scale-[1.02] disabled:transform-none"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Unlocking Vault...</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-5 h-5" />
-                  <span>Unlock Vault</span>
-                </>
-              )}
-            </button>
           </div>
 
-          {/* Sign Up Link */}
-          <div className="mt-6 pt-6 border-t border-slate-700/50 text-center text-sm text-slate-400">
-            Don't have an account?{" "}
-            <button
-              onClick={() => onNavigate("register")}
-              className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-            >
-              Create one
-            </button>
+          {/* Login Button */}
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-600 text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Unlocking Vault...
+              </>
+            ) : (
+              "Unlock Vault"
+            )}
+          </button>
+
+          {/* Register Link */}
+          <div className="mt-6 text-center">
+            <p className="text-slate-400 text-sm">
+              Don't have an account?{" "}
+              <button
+                onClick={() => onNavigate("register")}
+                className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+              >
+                Create Free Account
+              </button>
+            </p>
           </div>
         </div>
 

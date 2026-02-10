@@ -1,3 +1,4 @@
+// Security dashboard - shows password health analysis and security issues
 import {
     Shield,
     AlertTriangle,

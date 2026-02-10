@@ -1,3 +1,4 @@
+// Main navigation sidebar - shows app logo, menu items, and sign out button
 import {
     Shield,
     Lock,
@@ -6,6 +7,7 @@ import {
     LogOut,
     Plus
 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface SidebarProps {
     currentView: string;
@@ -75,9 +77,15 @@ export default function Sidebar({ currentView, onNavigate, onAddPassword }: Side
             {/* User Footer */}
             <div className="p-4 border-t border-slate-700/50">
                 <button
-                    onClick={() => {
-                        // TODO: Call Tauri lock_vault command here
-                        onNavigate("login");
+                    onClick={async () => {
+                        try {
+                            await invoke("lock_vault");
+                            console.log("Vault locked successfully");
+                        } catch (error) {
+                            console.error("Failed to lock vault:", error);
+                        } finally {
+                            onNavigate("login");
+                        }
                     }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-colors group"
                 >

@@ -1,11 +1,9 @@
-
+// Main app component - handles routing between login/register and authenticated pages
 import { useState, useEffect } from "react";
 // Removed Navbar since we have Sidebar now for authenticated pages
-// and Minimal Header for Landing Page
 import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import LandingPage from "./pages/LandingPage";
 import VaultPage from "./pages/VaultPage";
 import SecurityDashboardPage from "./pages/SecurityDashboardPage";
 import PasswordGeneratorPage from "./pages/PasswordGeneratorPage";
@@ -15,7 +13,7 @@ import { NotificationProvider } from "./context/NotificationContext";
 import ToastContainer from "./components/ToastContainer";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState("home");
+  const [currentView, setCurrentView] = useState("login");
 
   useEffect(() => {
     // Need to handle session revocation here or inside a child component that uses the notification context
@@ -46,7 +44,6 @@ export default function App() {
         <ToastContainer />
         {!isAuthView ? (
           <>
-            {currentView === "home" && <LandingPage onNavigate={handleNavigate} />}
             {currentView === "login" && <LoginPage onNavigate={handleNavigate} />}
             {currentView === "register" && <RegisterPage onNavigate={handleNavigate} />}
           </>

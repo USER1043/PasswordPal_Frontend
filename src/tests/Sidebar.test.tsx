@@ -1,17 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Sidebar from '../components/Sidebar';
-
-// Lucide icons will be rendered as SVGs by jsdom, no need to mock for basic visibility
-
-
 describe('Sidebar Component', () => {
     const mockNavigate = vi.fn();
 
     it('renders branding correctly', () => {
         render(<Sidebar currentView="vault" onNavigate={mockNavigate} />);
         expect(screen.getByText('PasswordPal')).toBeDefined();
-        // Check if SVG exists (lucide icons render as svgs)
         expect(document.querySelector('svg')).not.toBeNull();
     });
 

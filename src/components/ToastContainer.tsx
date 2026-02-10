@@ -1,3 +1,4 @@
+// Toast notification system - displays success, error, warning, and info messages to users
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import { useNotification, type ToastType } from '../context/NotificationContext';
 import { useEffect, useState } from 'react';
