@@ -1,58 +1,73 @@
+// Main app component - handles routing between login/register and authenticated pages
 import { useState, useEffect } from "react";
-import Navbar from "./components/Navbar";
+// Removed Navbar since we have Sidebar now for authenticated pages
+import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import LandingPage from "./pages/LandingPage";
 import VaultPage from "./pages/VaultPage";
+import SecurityDashboardPage from "./pages/SecurityDashboardPage";
+import PasswordGeneratorPage from "./pages/PasswordGeneratorPage";
+import SettingsPage from "./pages/SettingsPage";
 import { SESSION_REVOKED_EVENT } from "./api/axiosClient";
+import { NotificationProvider } from "./context/NotificationContext";
+import ToastContainer from "./components/ToastContainer";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState("home");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState("login");
 
   useEffect(() => {
-    const handleRevocation = (event: CustomEvent) => {
-      const message = event.detail?.message || "Session expired.";
-      setErrorMessage(message);
-      setCurrentView("login");
-      // Optional: Show alert or notification
-      alert(message);
-    };
-
-    window.addEventListener(SESSION_REVOKED_EVENT as any, handleRevocation);
-
-    return () => {
-      window.removeEventListener(
-        SESSION_REVOKED_EVENT as any,
-        handleRevocation,
-      );
-    };
+    // Need to handle session revocation here or inside a child component that uses the notification context
+    // Ideally, we move the listener inside a child component of NotificationProvider or use a ref access
   }, []);
 
-  const handleNavigate = (view: string) => {
-    setCurrentView(view);
-    setErrorMessage(null); // Clear error on navigation
+  // Wrapper component to handle notifications dependent on context
+  const AppContent = () => {
+    const [showAddPasswordModal, setShowAddPasswordModal] = useState(false);
+
+    const handleNavigate = (view: string) => {
+      setCurrentView(view);
+    };
+
+    const handleAddPassword = () => {
+      // Ensure we're on the vault page and open the modal
+      if (currentView !== "vault") {
+        setCurrentView("vault");
+      }
+      setShowAddPasswordModal(true);
+    };
+
+    // Views that are part of the "Authenticated App"
+    const isAuthView = ["vault", "security", "generator", "settings"].includes(currentView);
+
+    return (
+      <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-purple-500/30">
+        <ToastContainer />
+        {!isAuthView ? (
+          <>
+            {currentView === "login" && <LoginPage onNavigate={handleNavigate} />}
+            {currentView === "register" && <RegisterPage onNavigate={handleNavigate} />}
+          </>
+        ) : (
+          <AppLayout currentView={currentView} onNavigate={handleNavigate} onAddPassword={handleAddPassword}>
+            {currentView === "vault" && (
+              <VaultPage
+                onNavigate={handleNavigate}
+                showAddModal={showAddPasswordModal}
+                setShowAddModal={setShowAddPasswordModal}
+              />
+            )}
+            {currentView === "security" && <SecurityDashboardPage onNavigate={handleNavigate} />}
+            {currentView === "generator" && <PasswordGeneratorPage onNavigate={handleNavigate} />}
+            {currentView === "settings" && <SettingsPage onNavigate={handleNavigate} />}
+          </AppLayout>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Navbar - shown on all pages */}
-      <Navbar onNavigate={handleNavigate} currentView={currentView} />
-
-      {/* Page Content */}
-      <div className="container mx-auto p-4">
-        {errorMessage && currentView === "login" && (
-          <div className="bg-red-500/20 border border-red-500 text-red-100 p-4 rounded mb-4">
-            {errorMessage}
-          </div>
-        )}
-        {currentView === "home" && <LandingPage onNavigate={handleNavigate} />}
-        {currentView === "login" && <LoginPage onNavigate={handleNavigate} />}
-        {currentView === "register" && (
-          <RegisterPage onNavigate={handleNavigate} />
-        )}
-        {currentView === "vault" && <VaultPage onNavigate={handleNavigate} />}
-      </div>
-    </div>
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
   );
 }

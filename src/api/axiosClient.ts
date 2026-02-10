@@ -1,14 +1,19 @@
+// HTTP client for communicating with the backend API
+// Handles authentication cookies and session revocation
 import axios from "axios";
 import { invoke } from "@tauri-apps/api/core";
 
-// Define the custom event name
+// Custom event dispatched when session is revoked (e.g., password changed on another device)
 export const SESSION_REVOKED_EVENT = "session-revoked";
 
+// Create axios instance configured for our backend
 const apiClient = axios.create({
   baseURL: "http://localhost:3000", // Replace with actual API URL or config
   withCredentials: true,
 });
 
+
+// Securely wipes encryption keys from memory when user logs out or session expires
 export const wipe_sensitive_data = async () => {
   try {
     console.log("Wiping sensitive data from RAM...");
@@ -22,6 +27,8 @@ export const wipe_sensitive_data = async () => {
   }
 };
 
+
+// Intercept API responses to handle session expiration
 apiClient.interceptors.response.use(
   (response) => {
     return response;
