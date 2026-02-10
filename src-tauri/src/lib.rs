@@ -3,6 +3,7 @@
 pub mod state;
 pub mod models;
 pub mod commands;
+pub mod crypto;
 
 use std::sync::Mutex;
 
@@ -16,7 +17,9 @@ pub fn run() {
             commands::entry::decrypt_entry,
             commands::vault::unlock_vault,
             commands::vault::lock_vault,
-            commands::auth::change_password_optimization
+            commands::auth::change_password_optimization,
+            commands::auth::register_vault,
+            commands::auth::login_vault
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

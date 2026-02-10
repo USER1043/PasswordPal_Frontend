@@ -9,8 +9,16 @@ import {
   Loader2,
 } from "lucide-react";
 import RecoveryKeyModal from "../components/RecoveryKeyModal";
-import { generateRecoveryKey, generateSalt, hashPassword } from "../utils/crypto";
+// import { generateRecoveryKey, generateSalt, hashPassword } from "../utils/crypto"; // Mock utils unused
 import { registerDevice } from "../services/deviceService";
+import { invoke } from "@tauri-apps/api/core";
+
+interface RegisterResponse {
+  salt: string;
+  wrapped_mek: string;
+  auth_hash: string;
+  recovery_key: string;
+}
 
 interface RegisterPageProps {
   onNavigate: (view: string) => void;
@@ -67,16 +75,26 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setLoading(true);
 
     try {
-      // Generate salt and hash password
-      const salt = await generateSalt();
-      await hashPassword(masterPassword, salt);
+      // Call Rust backend to register vault (Generate Keys, derive KEK, etc.)
+      const response = await invoke<RegisterResponse>("register_vault", { 
+        password: masterPassword 
+      });
 
-      // Generate recovery key
-      const key = await generateRecoveryKey();
-      setRecoveryKey(key);
+      console.log("Registration Successful", {
+        salt: response.salt,
+        auth_hash: response.auth_hash
+      });
+
+      // Set recovery key from backend response
+      setRecoveryKey(response.recovery_key);
 
       // TODO: Send registration request to backend
-      // await axiosClient.post('/auth/register', { email, hashedPassword, salt });
+      // await axiosClient.post('/auth/register', { 
+      //   email, 
+      //   salt: response.salt, 
+      //   wrapped_mek: response.wrapped_mek,
+      //   auth_hash: response.auth_hash
+      // });
 
       // Register device
       await registerDevice();
@@ -279,6 +297,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         <RecoveryKeyModal
           recoveryKey={recoveryKey}
           onConfirm={handleRecoveryConfirm}
+          onClose={() => setShowRecoveryModal(false)}
         />
       )}
     </>

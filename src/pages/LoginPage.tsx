@@ -4,6 +4,11 @@
 import { useState } from "react";
 import { Shield, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
+import { invoke } from "@tauri-apps/api/core";
+
+interface LoginResponse {
+  auth_hash: string;
+}
 
 interface LoginPageProps {
   onNavigate: (view: string) => void;
@@ -25,11 +30,24 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
     setLoading(true);
 
     try {
-      // Simulate API call and crypto verification
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // TODO: Fetch 'salt' and 'wrapped_mek' from backend first
+      // const { salt, wrapped_mek } = await axiosClient.get('/auth/params', { params: { email } });
+      
+      // MOCK: using placeholders (this will fail decryption if not real values)
+      // In a real flow, these come from the server.
+      const mockSalt = "c29tZV9yYW5kb21fc2FsdF9ieXRlcw=="; // "some_random_salt_bytes" in base64
+      const mockWrappedMek = "c29tZV9yYW5kb21fd3JhcHBlZF9tZWtfYnl0ZXM="; 
 
-      // For demo purposes - in real app this would verify against stored hash
-      // const isValid = await verifyPassword(password, storedHash, storedSalt);
+      const response = await invoke<LoginResponse>("login_vault", {
+        password: password,
+        salt: mockSalt,
+        wrapped_mek: mockWrappedMek
+      });
+
+      console.log("Login Successful, MEK decrypted. Auth Hash:", response.auth_hash);
+
+      // Verify auth hash with server
+      // await axiosClient.post('/auth/login', { email, auth_hash: response.auth_hash });
 
       success("Welcome back! Your vault is unlocked.");
       onNavigate("vault");
