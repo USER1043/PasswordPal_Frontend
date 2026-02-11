@@ -1,0 +1,1546 @@
+﻿
+> passwordpal@0.1.0 test
+> vitest --run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mD:/PasswordPal/PasswordPal_Frontend[39m
+
+ [32mΓ£ô[39m src/tests/Placeholder.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/Toast.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 121[2mms[22m[39m
+node.exe : [90mstderr[2m 
+| src/tests/Sidebar.test.tsx
+[2m > [22m[2mSidebar 
+Component[2m > 
+[22m[2mhandles sign out 
+button click
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:\U
+sers\HP\AppData\Roaming\npm 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo          
+    : NotSpe    cified: 
+([90mst    derr[2m...ut 
+bu    tton click:Strin    
+g) [], RemoteExc    eption
+    + FullyQualified    
+ErrorId : Native    
+CommandError
+ 
+[22m[39mFailed to lock 
+vault: TypeError: Cannot 
+read properties of 
+undefined (reading 'invoke')
+    at invoke [90m(file:///
+D:/PasswordPal/PasswordPal_F
+rontend/[39mnode_modules/[
+4m@tauri-apps/api[24m/core.
+js:202:39[90m)[39m
+    at onClick (D:/PasswordP
+al/PasswordPal_Frontend/src/
+components/Sidebar.tsx:82:35
+)
+    at HTMLUnknownElement.ca
+llCallback [90m(D:\Password
+Pal\PasswordPal_Frontend\[3
+9mnode_modules\[4mreact-dom
+[24m\cjs\react-dom.developm
+ent.js:4164:14[90m)[39m
+    at HTMLUnknownElement.ca
+llTheUserObjectsOperation [
+90m(D:\PasswordPal\PasswordP
+al_Frontend\[39mnode_module
+s\[4mjsdom[24m\lib\jsdom\l
+iving\generated\EventListene
+r.js:26:30[90m)[39m
+    at 
+innerInvokeEventListeners [
+90m(D:\PasswordPal\PasswordP
+al_Frontend\[39mnode_module
+s\[4mjsdom[24m\lib\jsdom\l
+iving\events\EventTarget-imp
+l.js:360:16[90m)[39m
+    at invokeEventListeners 
+[90m(D:\PasswordPal\Passwor
+dPal_Frontend\[39mnode_modu
+les\[4mjsdom[24m\lib\jsdom
+\living\events\EventTarget-i
+mpl.js:296:3[90m)[39m
+    at HTMLUnknownElementImp
+l._dispatch [90m(D:\Passwor
+dPal\PasswordPal_Frontend\[
+39mnode_modules\[4mjsdom[2
+4m\lib\jsdom\living\events\E
+ventTarget-impl.js:243:9[90
+m)[39m
+    at HTMLUnknownElementImp
+l.dispatchEvent [90m(D:\Pas
+swordPal\PasswordPal_Fronten
+d\[39mnode_modules\[4mjsdo
+m[24m\lib\jsdom\living\even
+ts\EventTarget-impl.js:114:1
+7[90m)[39m
+    at HTMLUnknownElement.di
+spatchEvent [90m(D:\Passwor
+dPal\PasswordPal_Frontend\[
+39mnode_modules\[4mjsdom[2
+4m\lib\jsdom\living\generate
+d\EventTarget.js:241:34[90m
+)[39m
+    at Object.invokeGuardedC
+allbackDev [90m(D:\Password
+Pal\PasswordPal_Frontend\[3
+9mnode_modules\[4mreact-dom
+[24m\cjs\react-dom.developm
+ent.js:4213:16[90m)[39m
+
+ [32mΓ£ô[39m src/tests/Sidebar.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 157[2mms[22m[39m
+ [31mΓ¥»[39m src/tests/AddPasswordModal.test.tsx [2m([22m[2m18 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1423[2mms[22m[39m
+     [32mΓ£ô[39m renders modal when isOpen is true[32m 73[2mms[22m[39m
+     [32mΓ£ô[39m does not render when isOpen is false[32m 3[2mms[22m[39m
+     [32mΓ£ô[39m renders Edit Password title when editData is provided[32m 26[2mms[22m[39m
+     [32mΓ£ô[39m allows user to input password name[32m 15[2mms[22m[39m
+     [32mΓ£ô[39m allows user to input username[32m 9[2mms[22m[39m
+     [32mΓ£ô[39m allows user to input password[32m 9[2mms[22m[39m
+     [32mΓ£ô[39m calls onClose when Cancel button is clicked[32m 8[2mms[22m[39m
+     [32mΓ£ô[39m calls onClose when X button is clicked[32m 149[2mms[22m[39m
+     [32mΓ£ô[39m generates password when generate button is clicked[32m 29[2mms[22m[39m
+     [32mΓ£ô[39m toggles password visibility when eye button is clicked[32m 27[2mms[22m[39m
+     [32mΓ£ô[39m shows alert when saving with empty required fields[32m 7[2mms[22m[39m
+     [32mΓ£ô[39m calls onSave with form data when all required fields are filled[32m 10[2mms[22m[39m
+[31m     [31m├ù[31m calculates password strength correctly[39m[33m 1025[2mms[22m[39m
+     [32mΓ£ô[39m allows creating a new folder[32m 10[2mms[22m[39m
+     [32mΓ£ô[39m does not create folder with empty name[32m 6[2mms[22m[39m
+     [32mΓ£ô[39m cancels folder creation when Cancel button is clicked[32m 7[2mms[22m[39m
+     [32mΓ£ô[39m handles very long input values[32m 3[2mms[22m[39m
+     [32mΓ£ô[39m handles special characters in input fields[32m 4[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[
+39m[1m[41m Failed Tests 1 
+[49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m sr
+c/tests/AddPasswordModal.tes
+t.tsx[2m > 
+[22mAddPasswordModal 
+Component[2m > 
+[22mcalculates password 
+strength correctly
+[31m[1mTestingLibraryEleme
+ntError[22m[39m: Unable 
+to find an element with the 
+text: Medium. This could be 
+because the text is broken 
+up by multiple elements. In 
+this case, you can provide 
+a function for your text 
+matcher to make your 
+matcher more flexible.
+
+Ignored nodes: comments, 
+script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      
+[33mclass[39m=[32m"fixed 
+inset-0 z-50 flex 
+items-center justify-center 
+p-4 bg-black/60 
+backdrop-blur-sm"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32
+m"bg-slate-800 border 
+border-slate-700 
+rounded-2xl shadow-2xl 
+w-full max-w-2xl 
+max-h-[90vh] 
+overflow-y-auto"[39m
+      [36m>[39m
+        [36m<div[39m
+          
+[33mclass[39m=[32m"flex 
+items-center 
+justify-between p-6 
+border-b 
+border-slate-700"[39m
+        [36m>[39m
+          [36m<h2[39m
+            [33mclass[39m=
+[32m"text-2xl font-bold 
+text-white"[39m
+          [36m>[39m
+            [0mAdd New 
+Password[0m
+          [36m</h2>[39m
+          [36m<button[39m
+            [33mclass[39m=
+[32m"text-slate-400 
+hover:text-white 
+transition-colors p-2 
+hover:bg-slate-700/50 
+rounded-lg"[39m
+          [36m>[39m
+            [36m<svg[39m
+              
+[33mclass[39m=[32m"w-6 
+h-6"[39m
+              [33mfill[39m
+=[32m"none"[39m
+              [33mheight[3
+9m=[32m"24"[39m
+              [33mstroke[3
+9m=[32m"currentColor"[39m
+              [33mstroke-li
+necap[39m=[32m"round"[39m
+              [33mstroke-li
+nejoin[39m=[32m"round"[39
+m
+              [33mstroke-wi
+dth[39m=[32m"2"[39m
+              
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+              [33mwidth[39
+m=[32m"24"[39m
+              [33mxmlns[39
+m=[32m"http://www.w3.org/20
+00/svg"[39m
+            [36m>[39m
+              
+[36m<path[39m
+                
+[33md[39m=[32m"M18 6 6 
+18"[39m
+              [36m/>[39m
+              
+[36m<path[39m
+                
+[33md[39m=[32m"m6 6 12 
+12"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          
+[36m</button>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          
+[33mclass[39m=[32m"p-6 
+space-y-5"[39m
+        [36m>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mName [0m
+              
+[36m<span[39m
+                [33mclass[
+39m=[32m"text-red-400"[39m
+              [36m>[39m
+                [0m*[0m
+              
+[36m</span>[39m
+            
+[36m</label>[39m
+            [36m<input[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [33mplacehold
+er[39m=[32m"e.g., GitHub, 
+Gmail, Netflix"[39m
+              [33mtype[39m
+=[32m"text"[39m
+              
+[33mvalue[39m=[32m""[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mUsername 
+or Email [0m
+              
+[36m<span[39m
+                [33mclass[
+39m=[32m"text-red-400"[39m
+              [36m>[39m
+                [0m*[0m
+              
+[36m</span>[39m
+            
+[36m</label>[39m
+            [36m<input[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [33mplacehold
+er[39m=[32m"user@example.c
+om"[39m
+              [33mtype[39m
+=[32m"text"[39m
+              
+[33mvalue[39m=[32m""[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mPassword 
+[0m
+              
+[36m<span[39m
+                [33mclass[
+39m=[32m"text-red-400"[39m
+              [36m>[39m
+                [0m*[0m
+              
+[36m</span>[39m
+            
+[36m</label>[39m
+            [36m<div[39m
+              [33mclass[39
+m=[32m"relative"[39m
+            [36m>[39m
+              
+[36m<input[39m
+                [33mclass[
+39m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 pr-24 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all 
+font-mono"[39m
+                [33mplaceho
+lder[39m=[32m"Enter 
+password"[39m
+                [33mtype[3
+9m=[32m"password"[39m
+                [33mvalue[
+39m=[32m"MediumPass123"[39
+m
+              [36m/>[39m
+              [36m<div[39m
+                [33mclass[
+39m=[32m"absolute right-2 
+top-1/2 -translate-y-1/2 
+flex items-center 
+gap-1"[39m
+              [36m>[39m
+                
+[36m<button[39m
+                  
+[33mclass[39m=[32m"p-2 
+text-slate-400 
+hover:text-white 
+hover:bg-slate-700/50 
+rounded-lg 
+transition-colors"[39m
+                  [33mtitle
+[39m=[32m"Show"[39m
+                [36m>[39m
+                  
+[36m<svg[39m
+                    
+[33mclass[39m=[32m"w-4 
+h-4"[39m
+                    [33mfil
+l[39m=[32m"none"[39m
+                    [33mhei
+ght[39m=[32m"24"[39m
+                    [33mstr
+oke[39m=[32m"currentColor"
+[39m
+                    [33mstr
+oke-linecap[39m=[32m"round
+"[39m
+                    [33mstr
+oke-linejoin[39m=[32m"roun
+d"[39m
+                    [33mstr
+oke-width[39m=[32m"2"[39m
+                    
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+                    [33mwid
+th[39m=[32m"24"[39m
+                    [33mxml
+ns[39m=[32m"http://www.w3.
+org/2000/svg"[39m
+                  
+[36m>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M2 12s3-7 
+10-7 10 7 10 7-3 7-10 
+7-10-7-10-7Z"[39m
+                    
+[36m/>[39m
+                    
+[36m<circle[39m
+                      
+[33mcx[39m=[32m"12"[39m
+                      
+[33mcy[39m=[32m"12"[39m
+                      
+[33mr[39m=[32m"3"[39m
+                    
+[36m/>[39m
+                  
+[36m</svg>[39m
+                
+[36m</button>[39m
+                
+[36m<button[39m
+                  
+[33mclass[39m=[32m"p-2 
+text-purple-400 
+hover:text-purple-300 
+hover:bg-purple-500/10 
+rounded-lg 
+transition-colors"[39m
+                  [33mtitle
+[39m=[32m"Generate 
+password"[39m
+                [36m>[39m
+                  
+[36m<svg[39m
+                    
+[33mclass[39m=[32m"w-4 
+h-4"[39m
+                    [33mfil
+l[39m=[32m"none"[39m
+                    [33mhei
+ght[39m=[32m"24"[39m
+                    [33mstr
+oke[39m=[32m"currentColor"
+[39m
+                    [33mstr
+oke-linecap[39m=[32m"round
+"[39m
+                    [33mstr
+oke-linejoin[39m=[32m"roun
+d"[39m
+                    [33mstr
+oke-width[39m=[32m"2"[39m
+                    
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+                    [33mwid
+th[39m=[32m"24"[39m
+                    [33mxml
+ns[39m=[32m"http://www.w3.
+org/2000/svg"[39m
+                  
+[36m>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M3 12a9 9 
+0 0 1 9-9 9.75 9.75 0 0 1 
+6.74 2.74L21 8"[39m
+                    
+[36m/>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M21 
+3v5h-5"[39m
+                    
+[36m/>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M21 12a9 
+9 0 0 1-9 9 9.75 9.75 0 0 
+1-6.74-2.74L3 16"[39m
+                    
+[36m/>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M8 
+16H3v5"[39m
+                    
+[36m/>[39m
+                  
+[36m</svg>[39m
+                
+[36m</button>[39m
+              
+[36m</div>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39
+m=[32m"mt-2"[39m
+            [36m>[39m
+              [36m<div[39m
+                
+[33mclass[39m=[32m"flex 
+items-center 
+justify-between text-xs 
+mb-1"[39m
+              [36m>[39m
+                
+[36m<span[39m
+                  [33mclass
+[39m=[32m"text-slate-400"
+[39m
+                [36m>[39m
+                  
+[0mPassword Strength[0m
+                
+[36m</span>[39m
+                
+[36m<span[39m
+                  [33mclass
+[39m=[32m"font-semibold 
+text-green-400"[39m
+                [36m>[39m
+                  
+[0mStrong[0m
+                
+[36m</span>[39m
+              
+[36m</div>[39m
+              [36m<div[39m
+                
+[33mclass[39m=[32m"h-2 
+bg-slate-700 rounded-full 
+overflow-hidden"[39m
+              [36m>[39m
+                
+[36m<div[39m
+                  [33mclass
+[39m=[32m"h-full 
+bg-green-500 transition-all 
+duration-300"[39m
+                  [33mstyle
+[39m=[32m"width: 
+70%;"[39m
+                [36m/>[39m
+              
+[36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mWebsite 
+URL[0m
+            
+[36m</label>[39m
+            [36m<input[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [33mplacehold
+er[39m=[32m"https://exampl
+e.com"[39m
+              [33mtype[39m
+=[32m"url"[39m
+              
+[33mvalue[39m=[32m""[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mFolder[0m
+            
+[36m</label>[39m
+            [36m<div[39m
+              [33mclass[39
+m=[32m"space-y-2"[39m
+            [36m>[39m
+              
+[36m<select[39m
+                [33mclass[
+39m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [36m>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-slate-300"[39m
+                  
+[33mvalue[39m=[32m""[39m
+                [36m>[39m
+                  [0mNo 
+Folder[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Personal"[39m
+                [36m>[39m
+                  [0m≡ƒôü 
+Personal[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Work"[39m
+                [36m>[39m
+                  [0m≡ƒÆ╝ 
+Work[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Finance"[39m
+                [36m>[39m
+                  [0m≡ƒÆ░ 
+Finance[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Social"[39m
+                [36m>[39m
+                  [0m≡ƒîÉ 
+Social[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-purple-900/30
+ text-purple-300 
+font-semibold"[39m
+                  [33mvalue
+[39m=[32m"__create_new__"
+[39m
+                [36m>[39m
+                  [0mΓ₧ò 
+Create New Folder[0m
+                
+[36m</option>[39m
+              
+[36m</select>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mNotes[0m
+            
+[36m</label>[39m
+            
+[36m<textarea[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all 
+resize-none"[39m
+              [33mplacehold
+er[39m=[32m"Additional 
+notes (optional)"[39m
+              
+[33mrows[39m=[32m"3"[39m
+            [36m/>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          
+[33mclass[39m=[32m"flex 
+items-center justify-end 
+gap-3 p-6 border-t 
+border-slate-700"[39m
+        [36m>[39m
+          [36m<button[39m
+            
+[33mclass[39m=[32m"px-6 
+py-3 text-slate-300 
+hover:text-white 
+hover:bg-slate-700/50 
+rounded-xl font-medium 
+transition-all"[39m
+          [36m>[39m
+            [0mCancel[0m
+          
+[36m</button>[39m
+          [36m<button[39m
+            
+[33mclass[39m=[32m"px-6 
+py-3 bg-gradient-to-r 
+from-purple-600 
+to-purple-700 
+hover:from-purple-700 
+hover:to-purple-800 
+text-white rounded-xl 
+font-semibold 
+transition-all flex 
+items-center gap-2 
+shadow-lg hover:shadow-purpl
+e-500/50"[39m
+          [36m>[39m
+            [36m<svg[39m
+              
+[33mclass[39m=[32m"w-5 
+h-5"[39m
+              [33mfill[39m
+=[32m"none"[39m
+              [33mheight[3
+9m=[32m"24"[39m
+              [33mstroke[3
+9m=[32m"currentColor"[39m
+              [33mstroke-li
+necap[39m=[32m"round"[39m
+              [33mstroke-li
+nejoin[39m=[32m"round"[39
+m
+              [33mstroke-wi
+dth[39m=[32m"2"[39m
+              
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+              [33mwidth[39
+m=[32m"24"[39m
+              [33mxmlns[39
+m=[32m"http://www.w3.org/20
+00/svg"[39m
+            [36m>[39m
+              
+[36m<path[39m
+                
+[33md[39m=[32m"M19 
+21H5a2 2 0 0 1-2-2V5a2 2 0 
+0 1 2-2h11l5 5v11a2 2 0 0 
+1-2 2z"[39m
+              [36m/>[39m
+              
+[36m<polyline[39m
+                
+[33mpoints[39m=[32m"17 
+21 17 13 7 13 7 21"[39m
+              [36m/>[39m
+              
+[36m<polyline[39m
+                
+[33mpoints[39m=[32m"7 3 
+7 8 15 8"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mSave[0m
+          
+[36m</button>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, 
+script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      
+[33mclass[39m=[32m"fixed 
+inset-0 z-50 flex 
+items-center justify-center 
+p-4 bg-black/60 
+backdrop-blur-sm"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32
+m"bg-slate-800 border 
+border-slate-700 
+rounded-2xl shadow-2xl 
+w-full max-w-2xl 
+max-h-[90vh] 
+overflow-y-auto"[39m
+      [36m>[39m
+        [36m<div[39m
+          
+[33mclass[39m=[32m"flex 
+items-center 
+justify-between p-6 
+border-b 
+border-slate-700"[39m
+        [36m>[39m
+          [36m<h2[39m
+            [33mclass[39m=
+[32m"text-2xl font-bold 
+text-white"[39m
+          [36m>[39m
+            [0mAdd New 
+Password[0m
+          [36m</h2>[39m
+          [36m<button[39m
+            [33mclass[39m=
+[32m"text-slate-400 
+hover:text-white 
+transition-colors p-2 
+hover:bg-slate-700/50 
+rounded-lg"[39m
+          [36m>[39m
+            [36m<svg[39m
+              
+[33mclass[39m=[32m"w-6 
+h-6"[39m
+              [33mfill[39m
+=[32m"none"[39m
+              [33mheight[3
+9m=[32m"24"[39m
+              [33mstroke[3
+9m=[32m"currentColor"[39m
+              [33mstroke-li
+necap[39m=[32m"round"[39m
+              [33mstroke-li
+nejoin[39m=[32m"round"[39
+m
+              [33mstroke-wi
+dth[39m=[32m"2"[39m
+              
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+              [33mwidth[39
+m=[32m"24"[39m
+              [33mxmlns[39
+m=[32m"http://www.w3.org/20
+00/svg"[39m
+            [36m>[39m
+              
+[36m<path[39m
+                
+[33md[39m=[32m"M18 6 6 
+18"[39m
+              [36m/>[39m
+              
+[36m<path[39m
+                
+[33md[39m=[32m"m6 6 12 
+12"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          
+[36m</button>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          
+[33mclass[39m=[32m"p-6 
+space-y-5"[39m
+        [36m>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mName [0m
+              
+[36m<span[39m
+                [33mclass[
+39m=[32m"text-red-400"[39m
+              [36m>[39m
+                [0m*[0m
+              
+[36m</span>[39m
+            
+[36m</label>[39m
+            [36m<input[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [33mplacehold
+er[39m=[32m"e.g., GitHub, 
+Gmail, Netflix"[39m
+              [33mtype[39m
+=[32m"text"[39m
+              
+[33mvalue[39m=[32m""[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mUsername 
+or Email [0m
+              
+[36m<span[39m
+                [33mclass[
+39m=[32m"text-red-400"[39m
+              [36m>[39m
+                [0m*[0m
+              
+[36m</span>[39m
+            
+[36m</label>[39m
+            [36m<input[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [33mplacehold
+er[39m=[32m"user@example.c
+om"[39m
+              [33mtype[39m
+=[32m"text"[39m
+              
+[33mvalue[39m=[32m""[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mPassword 
+[0m
+              
+[36m<span[39m
+                [33mclass[
+39m=[32m"text-red-400"[39m
+              [36m>[39m
+                [0m*[0m
+              
+[36m</span>[39m
+            
+[36m</label>[39m
+            [36m<div[39m
+              [33mclass[39
+m=[32m"relative"[39m
+            [36m>[39m
+              
+[36m<input[39m
+                [33mclass[
+39m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 pr-24 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all 
+font-mono"[39m
+                [33mplaceho
+lder[39m=[32m"Enter 
+password"[39m
+                [33mtype[3
+9m=[32m"password"[39m
+                [33mvalue[
+39m=[32m"MediumPass123"[39
+m
+              [36m/>[39m
+              [36m<div[39m
+                [33mclass[
+39m=[32m"absolute right-2 
+top-1/2 -translate-y-1/2 
+flex items-center 
+gap-1"[39m
+              [36m>[39m
+                
+[36m<button[39m
+                  
+[33mclass[39m=[32m"p-2 
+text-slate-400 
+hover:text-white 
+hover:bg-slate-700/50 
+rounded-lg 
+transition-colors"[39m
+                  [33mtitle
+[39m=[32m"Show"[39m
+                [36m>[39m
+                  
+[36m<svg[39m
+                    
+[33mclass[39m=[32m"w-4 
+h-4"[39m
+                    [33mfil
+l[39m=[32m"none"[39m
+                    [33mhei
+ght[39m=[32m"24"[39m
+                    [33mstr
+oke[39m=[32m"currentColor"
+[39m
+                    [33mstr
+oke-linecap[39m=[32m"round
+"[39m
+                    [33mstr
+oke-linejoin[39m=[32m"roun
+d"[39m
+                    [33mstr
+oke-width[39m=[32m"2"[39m
+                    
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+                    [33mwid
+th[39m=[32m"24"[39m
+                    [33mxml
+ns[39m=[32m"http://www.w3.
+org/2000/svg"[39m
+                  
+[36m>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M2 12s3-7 
+10-7 10 7 10 7-3 7-10 
+7-10-7-10-7Z"[39m
+                    
+[36m/>[39m
+                    
+[36m<circle[39m
+                      
+[33mcx[39m=[32m"12"[39m
+                      
+[33mcy[39m=[32m"12"[39m
+                      
+[33mr[39m=[32m"3"[39m
+                    
+[36m/>[39m
+                  
+[36m</svg>[39m
+                
+[36m</button>[39m
+                
+[36m<button[39m
+                  
+[33mclass[39m=[32m"p-2 
+text-purple-400 
+hover:text-purple-300 
+hover:bg-purple-500/10 
+rounded-lg 
+transition-colors"[39m
+                  [33mtitle
+[39m=[32m"Generate 
+password"[39m
+                [36m>[39m
+                  
+[36m<svg[39m
+                    
+[33mclass[39m=[32m"w-4 
+h-4"[39m
+                    [33mfil
+l[39m=[32m"none"[39m
+                    [33mhei
+ght[39m=[32m"24"[39m
+                    [33mstr
+oke[39m=[32m"currentColor"
+[39m
+                    [33mstr
+oke-linecap[39m=[32m"round
+"[39m
+                    [33mstr
+oke-linejoin[39m=[32m"roun
+d"[39m
+                    [33mstr
+oke-width[39m=[32m"2"[39m
+                    
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+                    [33mwid
+th[39m=[32m"24"[39m
+                    [33mxml
+ns[39m=[32m"http://www.w3.
+org/2000/svg"[39m
+                  
+[36m>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M3 12a9 9 
+0 0 1 9-9 9.75 9.75 0 0 1 
+6.74 2.74L21 8"[39m
+                    
+[36m/>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M21 
+3v5h-5"[39m
+                    
+[36m/>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M21 12a9 
+9 0 0 1-9 9 9.75 9.75 0 0 
+1-6.74-2.74L3 16"[39m
+                    
+[36m/>[39m
+                    
+[36m<path[39m
+                      
+[33md[39m=[32m"M8 
+16H3v5"[39m
+                    
+[36m/>[39m
+                  
+[36m</svg>[39m
+                
+[36m</button>[39m
+              
+[36m</div>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39
+m=[32m"mt-2"[39m
+            [36m>[39m
+              [36m<div[39m
+                
+[33mclass[39m=[32m"flex 
+items-center 
+justify-between text-xs 
+mb-1"[39m
+              [36m>[39m
+                
+[36m<span[39m
+                  [33mclass
+[39m=[32m"text-slate-400"
+[39m
+                [36m>[39m
+                  
+[0mPassword Strength[0m
+                
+[36m</span>[39m
+                
+[36m<span[39m
+                  [33mclass
+[39m=[32m"font-semibold 
+text-green-400"[39m
+                [36m>[39m
+                  
+[0mStrong[0m
+                
+[36m</span>[39m
+              
+[36m</div>[39m
+              [36m<div[39m
+                
+[33mclass[39m=[32m"h-2 
+bg-slate-700 rounded-full 
+overflow-hidden"[39m
+              [36m>[39m
+                
+[36m<div[39m
+                  [33mclass
+[39m=[32m"h-full 
+bg-green-500 transition-all 
+duration-300"[39m
+                  [33mstyle
+[39m=[32m"width: 
+70%;"[39m
+                [36m/>[39m
+              
+[36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mWebsite 
+URL[0m
+            
+[36m</label>[39m
+            [36m<input[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [33mplacehold
+er[39m=[32m"https://exampl
+e.com"[39m
+              [33mtype[39m
+=[32m"url"[39m
+              
+[33mvalue[39m=[32m""[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mFolder[0m
+            
+[36m</label>[39m
+            [36m<div[39m
+              [33mclass[39
+m=[32m"space-y-2"[39m
+            [36m>[39m
+              
+[36m<select[39m
+                [33mclass[
+39m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all"[39m
+              [36m>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-slate-300"[39m
+                  
+[33mvalue[39m=[32m""[39m
+                [36m>[39m
+                  [0mNo 
+Folder[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Personal"[39m
+                [36m>[39m
+                  [0m≡ƒôü 
+Personal[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Work"[39m
+                [36m>[39m
+                  [0m≡ƒÆ╝ 
+Work[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Finance"[39m
+                [36m>[39m
+                  [0m≡ƒÆ░ 
+Finance[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-slate-800 
+text-white"[39m
+                  [33mvalue
+[39m=[32m"Social"[39m
+                [36m>[39m
+                  [0m≡ƒîÉ 
+Social[0m
+                
+[36m</option>[39m
+                
+[36m<option[39m
+                  [33mclass
+[39m=[32m"bg-purple-900/30
+ text-purple-300 
+font-semibold"[39m
+                  [33mvalue
+[39m=[32m"__create_new__"
+[39m
+                [36m>[39m
+                  [0mΓ₧ò 
+Create New Folder[0m
+                
+[36m</option>[39m
+              
+[36m</select>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<label[39m
+              
+[33mclass[39m=[32m"block 
+text-sm font-medium 
+text-slate-300 mb-2"[39m
+            [36m>[39m
+              [0mNotes[0m
+            
+[36m</label>[39m
+            
+[36m<textarea[39m
+              [33mclass[39
+m=[32m"w-full 
+bg-slate-900/50 border 
+border-slate-600 rounded-xl 
+px-4 py-3 text-white 
+placeholder-slate-500 
+focus:outline-none 
+focus:ring-2 
+focus:ring-purple-500 
+focus:border-transparent 
+transition-all 
+resize-none"[39m
+              [33mplacehold
+er[39m=[32m"Additional 
+notes (optional)"[39m
+              
+[33mrows[39m=[32m"3"[39m
+            [36m/>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          
+[33mclass[39m=[32m"flex 
+items-center justify-end 
+gap-3 p-6 border-t 
+border-slate-700"[39m
+        [36m>[39m
+          [36m<button[39m
+            
+[33mclass[39m=[32m"px-6 
+py-3 text-slate-300 
+hover:text-white 
+hover:bg-slate-700/50 
+rounded-xl font-medium 
+transition-all"[39m
+          [36m>[39m
+            [0mCancel[0m
+          
+[36m</button>[39m
+          [36m<button[39m
+            
+[33mclass[39m=[32m"px-6 
+py-3 bg-gradient-to-r 
+from-purple-600 
+to-purple-700 
+hover:from-purple-700 
+hover:to-purple-800 
+text-white rounded-xl 
+font-semibold 
+transition-all flex 
+items-center gap-2 
+shadow-lg hover:shadow-purpl
+e-500/50"[39m
+          [36m>[39m
+            [36m<svg[39m
+              
+[33mclass[39m=[32m"w-5 
+h-5"[39m
+              [33mfill[39m
+=[32m"none"[39m
+              [33mheight[3
+9m=[32m"24"[39m
+              [33mstroke[3
+9m=[32m"currentColor"[39m
+              [33mstroke-li
+necap[39m=[32m"round"[39m
+              [33mstroke-li
+nejoin[39m=[32m"round"[39
+m
+              [33mstroke-wi
+dth[39m=[32m"2"[39m
+              
+[33mviewBox[39m=[32m"0 0 
+24 24"[39m
+              [33mwidth[39
+m=[32m"24"[39m
+              [33mxmlns[39
+m=[32m"http://www.w3.org/20
+00/svg"[39m
+            [36m>[39m
+              
+[36m<path[39m
+                
+[33md[39m=[32m"M19 
+21H5a2 2 0 0 1-2-2V5a2 2 0 
+0 1 2-2h11l5 5v11a2 2 0 0 
+1-2 2z"[39m
+              [36m/>[39m
+              
+[36m<polyline[39m
+                
+[33mpoints[39m=[32m"17 
+21 17 13 7 13 7 21"[39m
+              [36m/>[39m
+
+              
+[36m<polyline[39m
+                
+[33mpoints[39m=[32m"7 3 
+7 8 15 8"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mSave[0m
+          
+[36m</button>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2mΓ¥»[22m 
+waitForWrapper node_modules/
+@testing-library/dom/dist/wa
+it-for.js:[2m163:27[22m[3
+9m
+[90m [2mΓ¥»[22m node_modu
+les/@testing-library/dom/dis
+t/query-helpers.js:[2m86:33
+[22m[39m
+[36m [2mΓ¥»[22m src/tests
+/AddPasswordModal.test.tsx:
+[2m272:42[22m[39m
+    [90m270| [39m        
+[90m// Medium password[39m
+    [90m271| [39m        f
+ireEvent.change(passwordInpu
+t, { target: { value: 
+'MediumPassΓÇª
+    [90m272| [39m        
+[35mconst[39m mediumLabel 
+[33m=[39m [35mawait[39m 
+screen[33m.[39m[34mfindBy
+Text[39m([32m'Medium'[39m
+)[33m;[39m
+    [90m   | [39m         
+                            
+    [31m^[39m
+    [90m273| [39m        
+[34mexpect[39m(mediumLabel)
+[33m.[39m[34mtoBeDefined
+[39m()[33m;[39m
+    [90m274| [39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»Γ
+Ä»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ
+»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/
+1]ΓÄ»[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m34 passed[39m[22m[90m (35)[39m
+[2m   Start at [22m 12:36:24
+[2m   Duration [22m 4.04s[2m (transform 429ms, setup 629ms, import 2.67s, tests 1.70s, environment 4.49s)[22m
+

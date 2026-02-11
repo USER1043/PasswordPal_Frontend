@@ -1,0 +1,259 @@
+Unit Testing Documentation
+
+This document provides an overview of the unit tests for the PasswordPal Frontend (UI Components), how to run them, and the expected output for each test case.
+
+Running Tests
+
+To run the unit tests, execute the following command in the terminal within the PasswordPal_Frontend directory:
+
+npm test
+
+This will trigger the vitest runner defined in package.json.
+
+_______________________________________________________________________________
+
+Test Suites Breakdown
+
+1. AddPasswordModal Component (tests/AddPasswordModal.test.tsx)
+Description: Tests the modal dialog for adding and editing password entries.
+
+Rendering Tests
+
+Test: renders modal when isOpen is true
+    Case: Modal should display when isOpen prop is true
+        Expected: Modal with title "Add New Password" is visible in DOM.
+
+Test: does not render when isOpen is false
+    Case: Modal should not display when isOpen prop is false
+        Expected: Modal is not present in DOM.
+
+Test: renders Edit Password title when editData is provided
+    Case: Modal should show "Edit Password" title when editing existing entry
+        Expected: Title changes to "Edit Password" when editData prop is provided.
+
+Form Input Tests
+
+Test: allows user to input password name
+    Case: User can type in the name field
+        Expected: Input value updates to "GitHub" when typed.
+
+Test: allows user to input username
+    Case: User can type in the username/email field
+        Expected: Input value updates to "test@example.com" when typed.
+
+Test: allows user to input password
+    Case: User can type in the password field
+        Expected: Input value updates to "SecurePassword123!" when typed.
+
+Button Interaction Tests
+
+Test: calls onClose when Cancel button is clicked
+    Case: Clicking Cancel button triggers close callback
+        Expected: onClose function is called once.
+
+Test: calls onClose when X button is clicked
+    Case: Clicking X (close) button in header triggers close callback
+        Expected: onClose function is called.
+
+Test: generates password when generate button is clicked
+    Case: Clicking generate button creates random password
+        Expected: Password field value changes to a non-empty random string.
+
+Test: toggles password visibility when eye button is clicked
+    Case: Clicking eye icon toggles password visibility
+        Expected: Input type changes from "password" to "text" and back.
+
+Form Validation Tests
+
+Test: shows alert when saving with empty required fields
+    Case: Attempting to save without required fields shows error
+        Expected: Alert displays "Please fill in required fields", onSave is not called.
+
+Test: calls onSave with form data when all required fields are filled
+    Case: Saving with all required fields calls save callback
+        Expected: onSave is called with object containing name, username, and password.
+
+Password Strength Tests
+
+Test: calculates password strength correctly
+    Case: Password strength indicator updates based on password complexity
+        Expected: 
+            - "weak" → Shows "Weak" label
+            - "MediumPass123" → Shows "Medium" label
+            - "StrongPass123!@#" → Shows "Strong" label
+
+Folder Management Tests
+
+Test: allows creating a new folder
+    Case: User can create custom folder for organizing passwords
+        Expected: Folder input appears, folder is created and selected.
+
+Test: does not create folder with empty name
+    Case: Empty or whitespace-only folder names are rejected
+        Expected: Folder input remains visible, folder is not created.
+
+Test: cancels folder creation when Cancel button is clicked
+    Case: User can cancel folder creation process
+        Expected: Folder input disappears, returns to folder select.
+
+Edge Case Tests
+
+Test: handles very long input values
+    Case: Component handles extremely long text input (1000 characters)
+        Expected: Input accepts and stores 1000-character string without errors.
+
+Test: handles special characters in input fields
+    Case: Component handles special characters in password field
+        Expected: Input accepts special characters like !@#$%^&*()_+-=[]{}|;:'",.<>?/~`.
+
+_______________________________________________________________________________
+
+2. Sidebar Component (tests/Sidebar.test.tsx)
+Description: Tests the navigation sidebar with menu items and branding.
+
+Rendering Tests
+
+Test: renders branding correctly
+    Case: Sidebar displays PasswordPal logo and name
+        Expected: "PasswordPal" text and SVG icon are present.
+
+Test: renders all navigation items
+    Case: All menu items are visible
+        Expected: "My Vault", "Generator", "Security", and "Settings" are displayed.
+
+Test: renders sign out button
+    Case: Sign out button is visible
+        Expected: "Sign Out" button is present in DOM.
+
+Navigation Tests
+
+Test: highlights the current view
+    Case: Active menu item has highlight styling
+        Expected: Current view button has class "bg-purple-500/10".
+
+Test: calls onNavigate when a menu item is clicked
+    Case: Clicking menu item triggers navigation callback
+        Expected: onNavigate is called with "settings" when Settings is clicked.
+
+Test: navigates correctly between different views
+    Case: User can switch between multiple views
+        Expected: onNavigate is called with correct view names ("generator", "security").
+
+Interaction Tests
+
+Test: handles rapid multiple clicks on navigation items
+    Case: Component handles multiple rapid clicks without errors
+        Expected: onNavigate is called 3 times when clicked 3 times rapidly.
+
+Test: calls onAddPassword when New Item button is clicked
+    Case: Clicking "New Item" button triggers add password callback
+        Expected: onAddPassword is called once.
+
+Test: handles sign out button click
+    Case: Sign out button is clickable
+        Expected: Button is defined and clickable (actual sign out logic is in Tauri backend).
+
+_______________________________________________________________________________
+
+3. Toast Notification System (tests/Toast.test.tsx)
+Description: Tests the toast notification component for displaying user feedback messages.
+
+Initial State Tests
+
+Test: renders nothing initially
+    Case: No toasts are displayed on initial render
+        Expected: No alert elements are present in DOM.
+
+Toast Display Tests
+
+Test: renders success toast when triggered
+    Case: Success notification appears when triggered
+        Expected: Toast with "Success Message" text is displayed.
+
+Test: renders error toast when triggered
+    Case: Error notification appears when triggered
+        Expected: Toast with "Error Message" text is displayed.
+
+Test: renders warning toast when triggered
+    Case: Warning notification appears when triggered
+        Expected: Toast with "Warning Message" text is displayed.
+
+Test: renders info toast when triggered
+    Case: Info notification appears when triggered
+        Expected: Toast with "Info Message" text is displayed.
+
+Edge Case Tests
+
+Test: handles multiple toasts simultaneously
+    Case: Multiple toasts can be displayed at the same time
+        Expected: All three toasts ("Success Toast", "Error Toast", "Warning Toast") are visible.
+
+Test: handles very long messages
+    Case: Toast can display extremely long messages (500 characters)
+        Expected: Toast displays 500-character message without breaking layout.
+
+_______________________________________________________________________________
+
+4. Placeholder Test (tests/Placeholder.test.ts)
+Description: Basic test to verify testing framework setup.
+
+Test: placeholder test
+    Case: Simple assertion to confirm test runner works
+        Expected: Test passes with basic assertion.
+
+_______________________________________________________________________________
+
+Sample Success Output
+
+When all tests pass, the output should look similar to this:
+
+> passwordpal@0.1.0 test
+> vitest
+
+ RUN  v4.0.18 D:/PasswordPal/PasswordPal_Frontend
+
+ ✓ src/tests/Placeholder.test.ts (1 test) 3ms
+ ✓ src/tests/Toast.test.tsx (7 tests) 121ms
+ ✓ src/tests/Sidebar.test.tsx (9 tests) 157ms
+ ✓ src/tests/AddPasswordModal.test.tsx (18 tests) 353ms
+
+ Test Files  4 passed (4)
+      Tests  35 passed (35)
+   Start at  12:38:43
+   Duration  2.69s (transform 1.35s, setup 0ms, collect 3.70s, tests 2.52s, environment 4.22s)
+
+_______________________________________________________________________________
+
+Test Coverage Summary
+
+Component               Tests   Purpose
+AddPasswordModal        18      Form inputs, validation, password generation, strength calculation, folder management
+Sidebar                 9       Navigation, branding, menu interactions, sign out
+Toast                   7       Notification display for success/error/warning/info messages
+Placeholder             1       Testing framework verification
+TOTAL                   35      Complete UI component coverage
+
+_______________________________________________________________________________
+
+Notes
+
+- Scope: These tests cover UI components only (React components in the src folder).
+- Not Covered: Backend Rust logic, Tauri API calls, actual encryption/decryption, database operations.
+- Testing Framework: Vitest + React Testing Library + jsdom
+- No Build Tools Required: All tests run in Node.js environment without Visual Studio Build Tools.
+- Mock Data: Tests use mock functions (vi.fn()) to simulate callbacks and user interactions.
+- DOM Simulation: jsdom provides a browser-like environment for testing React components.
+
+_______________________________________________________________________________
+
+Troubleshooting
+
+If tests fail:
+1. Check that all dependencies are installed: npm install
+2. Verify Node.js version is compatible (v16 or higher recommended)
+3. Review error messages for specific test failures
+4. Ensure no syntax errors in component files
+5. Check that test files are in src/tests/ directory
+
+For detailed test failure information, run:
+npm test -- --reporter=verbose
