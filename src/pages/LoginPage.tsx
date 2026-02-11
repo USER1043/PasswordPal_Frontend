@@ -4,11 +4,10 @@
 import { useState } from "react";
 import { Shield, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
-import { invoke } from "@tauri-apps/api/core";
+// import { invoke } from "@tauri-apps/api/core";
+import { authService } from "../services/authService";
 
-interface LoginResponse {
-  auth_hash: string;
-}
+// interface LoginResponse moved to authService
 
 interface LoginPageProps {
   onNavigate: (view: string) => void;
@@ -30,29 +29,22 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
     setLoading(true);
 
     try {
-      // TODO: Fetch 'salt' and 'wrapped_mek' from backend first
-      // const { salt, wrapped_mek } = await axiosClient.get('/auth/params', { params: { email } });
-      
-      // MOCK: using placeholders (this will fail decryption if not real values)
-      // In a real flow, these come from the server.
-      const mockSalt = "c29tZV9yYW5kb21fc2FsdF9ieXRlcw=="; // "some_random_salt_bytes" in base64
-      const mockWrappedMek = "c29tZV9yYW5kb21fd3JhcHBlZF9tZWtfYnl0ZXM="; 
-
-      const response = await invoke<LoginResponse>("login_vault", {
-        password: password,
-        salt: mockSalt,
-        wrapped_mek: mockWrappedMek
-      });
-
-      console.log("Login Successful, MEK decrypted. Auth Hash:", response.auth_hash);
-
-      // Verify auth hash with server
-      // await axiosClient.post('/auth/login', { email, auth_hash: response.auth_hash });
+      // Zero Knowledge Login Flow
+      // 1. Get Params -> 2. Derive Key & Unlock (Rust) -> 3. Authenticate (Backend)
+      await authService.login(email, password);
 
       success("Welcome back! Your vault is unlocked.");
       onNavigate("vault");
-    } catch (err) {
-      notifyError("Invalid credentials");
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      // Distinguish between User Not Found (404), Bad Auth (401), or other
+      if (err.response?.status === 404) {
+        notifyError("User not found");
+      } else if (err.response?.status === 401) {
+        notifyError("Invalid password");
+      } else {
+        notifyError("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

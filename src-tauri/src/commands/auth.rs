@@ -25,13 +25,11 @@ pub struct LoginResponse {
     pub auth_hash: String,
 }
 
-/// Registers a new vault by generating fresh keys.
-/// Returns the Salt, Wrapped MEK, and AuthHash to be sent to the server.
-#[tauri::command]
-pub fn register_vault(
-    state: State<'_, Mutex<VaultState>>,
+/// Core logic for registering a vault.
+/// Separated for testing.
+pub fn register_vault_logic(
     password: String
-) -> Result<RegisterResponse, String> {
+) -> Result<(RegisterResponse, Vec<u8>), String> {
     // 1. Generate new random Salt
     let salt = crypto::generate_salt()?;
     
@@ -58,31 +56,40 @@ pub fn register_vault(
     wrapped_mek_bytes.extend_from_slice(&nonce_bytes);
     wrapped_mek_bytes.extend_from_slice(&encrypted_mek);
     
+    Ok((RegisterResponse {
+        salt: general_purpose::STANDARD.encode(salt),
+        wrapped_mek: general_purpose::STANDARD.encode(&wrapped_mek_bytes),
+        auth_hash,
+        recovery_key: general_purpose::STANDARD.encode(&*mek),
+    }, mek.to_vec()))
+}
+
+/// Registers a new vault by generating fresh keys.
+/// Returns the Salt, Wrapped MEK, and AuthHash to be sent to the server.
+#[tauri::command]
+pub fn register_vault(
+    state: State<'_, Mutex<VaultState>>,
+    password: String
+) -> Result<RegisterResponse, String> {
+    let (response, mek) = register_vault_logic(password)?;
+
     // 6. Store MEK in State (Unlock the vault immediately)
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
     let mut stored_mek = Zeroizing::new([0u8; 32]);
-    stored_mek.copy_from_slice(&*mek);
-    st.enc_key = Some(stored_mek.to_vec()); // TODO: Update VaultState to use Zeroizing or Vec<u8> properly
+    stored_mek.copy_from_slice(&mek);
+    st.enc_key = Some(stored_mek.to_vec());
     st.unlocked = true;
 
-    // 7. Return payload for server
-    Ok(RegisterResponse {
-        salt: general_purpose::STANDARD.encode(salt),
-        wrapped_mek: general_purpose::STANDARD.encode(wrapped_mek_bytes),
-        auth_hash,
-        recovery_key: general_purpose::STANDARD.encode(&*mek),
-    })
+    Ok(response)
 }
 
-/// Logs in by deriving keys and unwrapping the MEK.
-/// Returns AuthHash for server verification.
-#[tauri::command]
-pub fn login_vault(
-    state: State<'_, Mutex<VaultState>>,
+/// Core logic for logging in.
+/// Separated for testing.
+pub fn login_vault_logic(
     password: String,
     salt: String,
     wrapped_mek: String,
-) -> Result<LoginResponse, String> {
+) -> Result<(LoginResponse, Vec<u8>), String> {
     // 1. Decode inputs
     let salt_bytes = general_purpose::STANDARD.decode(salt)
         .map_err(|_| "Invalid salt base64")?;
@@ -106,6 +113,23 @@ pub fn login_vault(
     if mek_vec.len() != 32 {
         return Err("Invalid MEK length".into());
     }
+    
+    // 5. Compute AuthHash
+    let auth_hash = crypto::compute_auth_hash(&*kek);
+    
+    Ok((LoginResponse { auth_hash }, mek_vec))
+}
+
+/// Logs in by deriving keys and unwrapping the MEK.
+/// Returns AuthHash for server verification.
+#[tauri::command]
+pub fn login_vault(
+    state: State<'_, Mutex<VaultState>>,
+    password: String,
+    salt: String,
+    wrapped_mek: String,
+) -> Result<LoginResponse, String> {
+    let (response, mek_vec) = login_vault_logic(password, salt, wrapped_mek)?;
 
     // 4. Store MEK in State
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
@@ -114,22 +138,16 @@ pub fn login_vault(
     st.enc_key = Some(stored_mek.to_vec());
     st.unlocked = true;
     
-    // 5. Compute AuthHash
-    let auth_hash = crypto::compute_auth_hash(&*kek);
-    
-    Ok(LoginResponse { auth_hash })
+    Ok(response)
 }
 
-
-/// Changes the user's password by re-wrapping the Master Encryption Key (MEK).
-#[tauri::command]
-pub fn change_password_optimization(
+/// Core logic for changing password.
+pub fn change_password_optimization_logic(
     encrypted_mek_blob: String, 
     old_password: String,
     new_password: String,
     salt: String,
 ) -> Result<String, String> {
-
     // Decode inputs
     let stored_wrapped_key_bytes = general_purpose::STANDARD
         .decode(encrypted_mek_blob)
@@ -177,10 +195,13 @@ pub fn change_password_optimization(
     Ok(general_purpose::STANDARD.encode(out))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Reusing the crypto module tests is sufficient for key derivation, 
-    // but we can add integration tests here if needed.
+/// Changes the user's password by re-wrapping the Master Encryption Key (MEK).
+#[tauri::command]
+pub fn change_password_optimization(
+    encrypted_mek_blob: String, 
+    old_password: String,
+    new_password: String,
+    salt: String,
+) -> Result<String, String> {
+    change_password_optimization_logic(encrypted_mek_blob, old_password, new_password, salt)
 }
