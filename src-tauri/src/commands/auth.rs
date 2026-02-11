@@ -82,8 +82,6 @@ pub fn change_password_optimization(
         Aes256Gcm::new_from_slice(&*old_kek).map_err(|_| "Failed to init cipher with old KEK")?;
 
     // This is the Raw MEK
-    // CRITICAL: We successfully obtain the raw MEK. This key remains unchanged to preserve vault data validity.
-    // We treat this sensitive data with extreme care.
     let raw_mek = Zeroizing::new(
         cipher_old
             .decrypt(nonce, ciphertext)
@@ -91,7 +89,7 @@ pub fn change_password_optimization(
     );
 
     // 4. Derive the new KEK from the new password.
-    let new_kek = derive_key(&new_password, &salt_bytes)?;
+    let new_kek = crypto::derive_kek(&new_password, &salt_bytes)?;
 
     // 5. Encrypt the raw MEK with the new KEK.
     let cipher_new =
