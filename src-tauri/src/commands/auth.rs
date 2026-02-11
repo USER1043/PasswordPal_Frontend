@@ -1,149 +1,37 @@
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Nonce,
+};
+use argon2::{
+    password_hash::{PasswordHasher, Salt},
+    Argon2,
+};
 use base64::{engine::general_purpose, Engine as _};
 use rand_core::{OsRng, TryRngCore};
-use aes_gcm::{
-  aead::{Aead, KeyInit},
-  Aes256Gcm, Nonce
-};
 use zeroize::Zeroizing;
-use tauri::State;
-use std::sync::Mutex;
-use serde::Serialize;
 
-use crate::state::VaultState;
-use crate::crypto;
-
-#[derive(Serialize)]
-pub struct RegisterResponse {
-    pub salt: String,
-    pub wrapped_mek: String,
-    pub auth_hash: String,
-    pub recovery_key: String,
-}
-
-#[derive(Serialize)]
-pub struct LoginResponse {
-    pub auth_hash: String,
-}
-
-/// Core logic for registering a vault.
-/// Separated for testing.
-pub fn register_vault_logic(
-    password: String
-) -> Result<(RegisterResponse, Vec<u8>), String> {
-    // 1. Generate new random Salt
-    let salt = crypto::generate_salt()?;
-    
-    // 2. Generate new random MEK
-    let mek = crypto::generate_mek()?;
-    
-    // 3. Derive KEK from password + salt
-    let kek = crypto::derive_kek(&password, &salt)?;
-    
-    // 4. Compute AuthHash (SHA-256 of KEK)
-    let auth_hash = crypto::compute_auth_hash(&*kek);
-    
-    // 5. Wrap (Encrypt) MEK with KEK
-    let cipher = Aes256Gcm::new_from_slice(&*kek).map_err(|_| "Failed to create cipher")?;
-    let mut nonce_bytes = [0u8; 12];
-    OsRng.try_fill_bytes(&mut nonce_bytes).map_err(|e| format!("OS RNG failed: {}", e))?;
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    
-    let encrypted_mek = cipher.encrypt(nonce, mek.as_slice())
-        .map_err(|_| "Failed to encrypt MEK")?;
-        
-    // Combine Nonce + Ciphertext for storage
-    let mut wrapped_mek_bytes = Vec::new();
-    wrapped_mek_bytes.extend_from_slice(&nonce_bytes);
-    wrapped_mek_bytes.extend_from_slice(&encrypted_mek);
-    
-    Ok((RegisterResponse {
-        salt: general_purpose::STANDARD.encode(salt),
-        wrapped_mek: general_purpose::STANDARD.encode(&wrapped_mek_bytes),
-        auth_hash,
-        recovery_key: general_purpose::STANDARD.encode(&*mek),
-    }, mek.to_vec()))
-}
-
-/// Registers a new vault by generating fresh keys.
-/// Returns the Salt, Wrapped MEK, and AuthHash to be sent to the server.
+/// Changes the user's password by re-wrapping the Master Encryption Key (MEK).
+///
+/// # Efficiency and Security
+///
+/// This operation is **O(1)** relative to the vault size. Instead of re-encrypting every individual vault item
+/// (which would be O(N)), we only re-encrypt the Key Encryption Key (KEK) that protects the MEK.
+///
+/// **Architecture:**
+/// - **MEK (Master Encryption Key):** A random key that encrypts user data. This key *never* changes.
+/// - **KEK (Key Encryption Key):** Derived from the user's password. This encrypts the MEK.
+///
+/// **Process:**
+/// 1. Derive the **Old KEK** from the old password.
+/// 2. Decrypt the **MEK** using the Old KEK.
+/// 3. Derive the **New KEK** from the new password.
+/// 4. Encrypt the **MEK** using the New KEK.
+///
+/// **Security Note:** The raw MEK is exposed in memory only briefly and is securely zeroed out immediately after use
+/// via the `Zeroizing` wrapper. The actual vault data remains safely encrypted with the constant MEK.
 #[tauri::command]
-pub fn register_vault(
-    state: State<'_, Mutex<VaultState>>,
-    password: String
-) -> Result<RegisterResponse, String> {
-    let (response, mek) = register_vault_logic(password)?;
-
-    // 6. Store MEK in State (Unlock the vault immediately)
-    let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
-    let mut stored_mek = Zeroizing::new([0u8; 32]);
-    stored_mek.copy_from_slice(&mek);
-    st.enc_key = Some(stored_mek.to_vec());
-    st.unlocked = true;
-
-    Ok(response)
-}
-
-/// Core logic for logging in.
-/// Separated for testing.
-pub fn login_vault_logic(
-    password: String,
-    salt: String,
-    wrapped_mek: String,
-) -> Result<(LoginResponse, Vec<u8>), String> {
-    // 1. Decode inputs
-    let salt_bytes = general_purpose::STANDARD.decode(salt)
-        .map_err(|_| "Invalid salt base64")?;
-    let wrapped_mek_bytes = general_purpose::STANDARD.decode(wrapped_mek)
-        .map_err(|_| "Invalid wrapped_mek base64")?;
-        
-    // 2. Derive KEK
-    let kek = crypto::derive_kek(&password, &salt_bytes)?;
-    
-    // 3. Unwrap MEK
-    if wrapped_mek_bytes.len() < 12 {
-        return Err("Wrapped MEK too short".into());
-    }
-    let (nonce_bytes, ciphertext) = wrapped_mek_bytes.split_at(12);
-    let nonce = Nonce::from_slice(nonce_bytes);
-    let cipher = Aes256Gcm::new_from_slice(&*kek).map_err(|_| "Failed to init cipher")?;
-    
-    let mek_vec = cipher.decrypt(nonce, ciphertext)
-        .map_err(|_| "Invalid password or corrupted vault")?;
-        
-    if mek_vec.len() != 32 {
-        return Err("Invalid MEK length".into());
-    }
-    
-    // 5. Compute AuthHash
-    let auth_hash = crypto::compute_auth_hash(&*kek);
-    
-    Ok((LoginResponse { auth_hash }, mek_vec))
-}
-
-/// Logs in by deriving keys and unwrapping the MEK.
-/// Returns AuthHash for server verification.
-#[tauri::command]
-pub fn login_vault(
-    state: State<'_, Mutex<VaultState>>,
-    password: String,
-    salt: String,
-    wrapped_mek: String,
-) -> Result<LoginResponse, String> {
-    let (response, mek_vec) = login_vault_logic(password, salt, wrapped_mek)?;
-
-    // 4. Store MEK in State
-    let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
-    let mut stored_mek = Zeroizing::new([0u8; 32]);
-    stored_mek.copy_from_slice(&mek_vec);
-    st.enc_key = Some(stored_mek.to_vec());
-    st.unlocked = true;
-    
-    Ok(response)
-}
-
-/// Core logic for changing password.
-pub fn change_password_optimization_logic(
-    encrypted_mek_blob: String, 
+pub fn change_password_optimization(
+    encrypted_mek_blob: String,
     old_password: String,
     new_password: String,
     salt: String,
@@ -157,8 +45,31 @@ pub fn change_password_optimization_logic(
         .decode(salt)
         .map_err(|_| "Invalid base64 salt")?;
 
-    // 2. Derive the Key Encryption Key (KEK) from the old password using shared crypto lib.
-    let old_kek = crypto::derive_kek(&old_password, &salt_bytes)?;
+    // Helper function to derive a key from a password and salt using Argon2.
+    fn derive_key(password: &str, salt_bytes: &[u8]) -> Result<Zeroizing<[u8; 32]>, String> {
+        let mut output_key = Zeroizing::new([0u8; 32]);
+        let argon2 = Argon2::default();
+
+        // Prepare the salt string to satisfy API requirements.
+        let salt_b64_string = general_purpose::STANDARD_NO_PAD.encode(salt_bytes);
+        let salt = Salt::from_b64(&salt_b64_string).map_err(|e| format!("Invalid salt: {}", e))?;
+
+        let hash = argon2
+            .hash_password(password.as_bytes(), salt)
+            .map_err(|e| format!("Argon2 error: {}", e))?;
+
+        let hash_bytes = hash.hash.ok_or("No hash output")?;
+
+        if hash_bytes.len() != 32 {
+            return Err("Derived key length mismatch".into());
+        }
+        output_key.copy_from_slice(hash_bytes.as_bytes());
+
+        Ok(output_key)
+    }
+
+    // 2. Derive the Key Encryption Key (KEK) from the old password.
+    let old_kek = derive_key(&old_password, &salt_bytes)?;
 
     // 3. Decrypt the Master Encryption Key (MEK) using the old KEK.
     if stored_wrapped_key_bytes.len() < 12 {
@@ -166,25 +77,32 @@ pub fn change_password_optimization_logic(
     }
     let (nonce_bytes, ciphertext) = stored_wrapped_key_bytes.split_at(12);
     let nonce = Nonce::from_slice(nonce_bytes);
-    
-    let cipher_old = Aes256Gcm::new_from_slice(&*old_kek).map_err(|_| "Failed to init cipher with old KEK")?;
-    
+
+    let cipher_old =
+        Aes256Gcm::new_from_slice(&*old_kek).map_err(|_| "Failed to init cipher with old KEK")?;
+
     // This is the Raw MEK
     let raw_mek = Zeroizing::new(
-        cipher_old.decrypt(nonce, ciphertext).map_err(|_| "Failed to decrypt MEK with old password")?
+        cipher_old
+            .decrypt(nonce, ciphertext)
+            .map_err(|_| "Failed to decrypt MEK with old password")?,
     );
 
     // 4. Derive the new KEK from the new password.
     let new_kek = crypto::derive_kek(&new_password, &salt_bytes)?;
 
     // 5. Encrypt the raw MEK with the new KEK.
-    let cipher_new = Aes256Gcm::new_from_slice(&*new_kek).map_err(|_| "Failed to init cipher with new KEK")?;
-    
+    let cipher_new =
+        Aes256Gcm::new_from_slice(&*new_kek).map_err(|_| "Failed to init cipher with new KEK")?;
+
     let mut new_nonce_bytes = [0u8; 12];
-    OsRng.try_fill_bytes(&mut new_nonce_bytes).map_err(|e| format!("OS RNG failed: {}", e))?;
+    OsRng
+        .try_fill_bytes(&mut new_nonce_bytes)
+        .map_err(|e| format!("OS RNG failed: {}", e))?;
     let new_nonce = Nonce::from_slice(&new_nonce_bytes);
-    
-    let new_ciphertext = cipher_new.encrypt(new_nonce, raw_mek.as_slice())
+
+    let new_ciphertext = cipher_new
+        .encrypt(new_nonce, raw_mek.as_slice())
         .map_err(|_| "Failed to encrypt MEK with new password")?;
 
     // 6. Concatenate the new nonce and ciphertext to form the final result.
@@ -193,15 +111,4 @@ pub fn change_password_optimization_logic(
     out.extend_from_slice(&new_ciphertext);
 
     Ok(general_purpose::STANDARD.encode(out))
-}
-
-/// Changes the user's password by re-wrapping the Master Encryption Key (MEK).
-#[tauri::command]
-pub fn change_password_optimization(
-    encrypted_mek_blob: String, 
-    old_password: String,
-    new_password: String,
-    salt: String,
-) -> Result<String, String> {
-    change_password_optimization_logic(encrypted_mek_blob, old_password, new_password, salt)
 }

@@ -1,7 +1,7 @@
-use tauri::State;
-use std::sync::Mutex;
-use base64::{engine::general_purpose, Engine as _};
 use crate::state::VaultState;
+use base64::{engine::general_purpose, Engine as _};
+use std::sync::Mutex;
+use tauri::State;
 
 /// Unlocks the vault with the provided Base64-encoded key.
 ///
@@ -45,5 +45,3 @@ pub fn lock_vault(state: State<'_, Mutex<VaultState>>) -> Result<(), String> {
 pub fn lock_vault_logic(st: &mut VaultState) {
     st.lock_and_wipe();
 }
-
-
