@@ -1,0 +1,175 @@
+Unit Testing Documentation – Rust component
+
+This document provides an overview of the unit tests for the Password Pal client side’s backend (rust components), how to run them, and the expected output for each test case.
+
+Running Tests:
+To run the unit tests, execute the following command in the terminal within the PasswordPal_Frontend directory:
+```bash
+Cargo test
+```
+This will trigger the cargo test runner.
+
+Test Suites Breakdown:
+
+1. Auth Tests
+
+Test: test_change_password_invalid_base64_blob
+Expected: The function should return an error when the provided password blob is not a valid base64 encoded string.
+
+Test: test_change_password_blob_too_short
+Expected: The function should return an error when the password blob length is less than the expected minimum.
+
+Test: test_change_password_invalid_salt
+Expected: The function should return an error when the salt is not a valid base64 string or is of incorrect length.
+
+Test: test_register_vault_success
+Expected: The vault is successfully initialized and the encrypted master key is stored.
+
+Test: test_login_vault_failure_wrong_password
+Expected: Login fails with an unauthorized or incorrect password error.
+
+Test: test_change_password_invalid_old_password
+Expected: Password change fails if the provided old password does not match the stored one.
+
+Test: test_login_vault_success
+Expected: User successfully authenticates and the vault is unlocked.
+
+Test: test_change_password_empty_passwords
+Expected: Password change fails if the provided old or new password is empty.
+
+Test: test_change_password_success
+Expected: Password is changed successfully and the vault is updated.
+
+Test: test_change_password_with_special_characters
+Expected: Password is changed successfully even when containing special characters.
+
+Test: test_change_password_multiple_times
+Expected: Password can be changed multiple times successfully.
+
+Output: 
+Running tests\auth_tests.rs (target\debug\deps\auth_tests-f9f47b1016197555.exe)
+
+running 11 tests
+test test_change_password_invalid_base64_blob ... ok
+test test_change_password_blob_too_short ... ok
+test test_change_password_invalid_salt ... ok
+test test_register_vault_success ... ok
+test test_login_vault_failure_wrong_password ... ok
+test test_change_password_invalid_old_password ... ok
+test test_login_vault_success ... ok
+test test_change_password_empty_passwords ... ok
+test test_change_password_success ... ok
+test test_change_password_with_special_characters ... ok
+test test_change_password_multiple_times ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s
+
+2. Entry Tests
+
+Test: test_decrypt_blob_too_short
+Expected: The function should return an error when the encrypted blob is too short to be valid.
+
+Test: test_decrypt_invalid_base64
+Expected: The function should return an error when the encrypted blob is not a valid base64 encoded string.
+
+Test: test_decrypt_fail_when_locked
+Expected: The function should return an error when trying to decrypt an entry in a locked vault.
+
+Test: test_decrypt_fail_tampered_data
+Expected: The function should return an error when the encrypted data has been tampered with (authentication check fails).
+
+Test: test_encrypt_entry_with_empty_fields
+Expected: The function should successfully encrypt an entry even if some fields (like URL or notes) are empty.
+
+Test: test_encrypt_entry_with_special_characters
+Expected: The function should successfully encrypt an entry containing special characters in the name, username, or password.
+
+Test: test_decrypt_with_wrong_key
+Expected: The function should return an error when attempting to decrypt with an incorrect key (simulating wrong master password).
+
+Test: test_encrypt_entry_with_unicode_characters
+Expected: The function should successfully encrypt an entry containing Unicode characters (e.g., emojis, non-ASCII).
+
+Test: test_encrypt_fail_when_locked
+Expected: The function should return an error when trying to encrypt an entry in a locked vault.
+
+Test: test_encrypt_decrypt_flow
+Expected: A successful round trip of encrypting an entry and then decrypting it should yield the original data.
+
+Test: test_encrypt_multiple_entries_sequentially
+Expected: Multiple entries should be encrypted successfully one after another without affecting each other.
+
+Test: test_encrypt_entry_with_very_long_url
+Expected: The function should handle and encrypt entries with very long URLs.
+
+Test: test_encrypt_large_entry
+Expected: The function should handle and encrypt entries with large amounts of data in the fields.
+
+Output:
+Running tests\entry_tests.rs (target\debug\deps\entry_tests-0d63bae1dea1ae1b.exe)
+
+running 13 tests
+test test_decrypt_blob_too_short ... ok
+test test_decrypt_invalid_base64 ... ok
+test test_decrypt_fail_when_locked ... ok
+test test_decrypt_fail_tampered_data ... ok
+test test_encrypt_entry_with_empty_fields ... ok
+test test_encrypt_entry_with_special_characters ... ok
+test test_decrypt_with_wrong_key ... ok
+test test_encrypt_entry_with_unicode_characters ... ok
+test test_encrypt_fail_when_locked ... ok
+test test_encrypt_decrypt_flow ... ok
+test test_encrypt_multiple_entries_sequentially ... ok
+test test_encrypt_entry_with_very_long_url ... ok
+test test_encrypt_large_entry ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+3.Vault Tests
+
+Test: test_lock_already_locked_vault
+Expected: The function should return an error when trying to lock an already locked vault.
+
+Test: test_unlock_vault_invalid_base64
+Expected: The function should return an error when the provided password blob is not a valid base64 encoded string.
+
+Test: test_state_after_failed_unlock
+Expected: The vault state should remain unchanged (locked) after a failed unlock attempt.
+
+Test: test_unlock_lock_cycle
+Expected: The vault should be able to be unlocked and then locked multiple times successfully.
+
+Test: test_lock_vault
+Expected: The vault should be successfully locked, and its state should reflect that it is locked.
+
+Test: test_unlock_vault_success
+Expected: The vault should be successfully unlocked with the correct password.
+
+Test: test_unlock_while_already_unlocked
+Expected: The function should return an error when trying to unlock an already unlocked vault.
+
+Test: test_unlock_with_all_different_byte_values
+Expected: The function should successfully unlock the vault even when the password contains all possible byte values (0-255).
+
+Test: test_unlock_with_various_key_lengths
+Expected: The function should successfully unlock the vault with passwords of various lengths.
+
+Test: test_unlock_vault_wrong_length
+Expected: The function should return an error when the provided password blob has an incorrect length.
+
+Output:
+Running tests\vault_tests.rs (target\debug\deps\vault_tests-034743b1035a67e8.exe)
+
+running 10 tests
+test test_lock_already_locked_vault ... ok
+test test_unlock_vault_invalid_base64 ... ok
+test test_state_after_failed_unlock ... ok
+test test_unlock_lock_cycle ... ok
+test test_lock_vault ... ok
+test test_unlock_vault_success ... ok
+test test_unlock_while_already_unlocked ... ok
+test test_unlock_with_all_different_byte_values ... ok
+test test_unlock_with_various_key_lengths ... ok
+test test_unlock_vault_wrong_length ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

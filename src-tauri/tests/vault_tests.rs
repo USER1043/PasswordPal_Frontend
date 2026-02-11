@@ -1,5 +1,4 @@
 // Integration tests for vault operations
-// Tests moved from src/commands/vault.rs and additional test cases
 
 mod common;
 
@@ -9,7 +8,7 @@ use passwordpal_lib::commands::vault::{lock_vault_logic, unlock_vault_logic};
 use passwordpal_lib::state::VaultState;
 
 // ============================================================================
-// EXISTING TESTS (moved from vault.rs)
+// TEST CASES
 // ============================================================================
 
 #[test]
@@ -56,10 +55,6 @@ fn test_lock_vault() {
     assert!(!state.unlocked);
     assert!(state.enc_key.is_none());
 }
-
-// ============================================================================
-// NEW TESTS (additional coverage)
-// ============================================================================
 
 #[test]
 fn test_unlock_lock_cycle() {

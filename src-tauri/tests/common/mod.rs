@@ -1,4 +1,5 @@
 // Common test utilities and helpers for integration tests
+#![allow(dead_code)]
 
 use base64::{engine::general_purpose, Engine as _};
 use zeroize::Zeroizing;
