@@ -7,6 +7,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose, Engine as _};
+use zeroize::Zeroizing;
 use common::{derive_test_key, get_test_salt, get_test_salt_b64};
 use passwordpal_lib::commands::auth::{
     change_password_optimization, login_vault_logic, register_vault_logic,
@@ -14,8 +15,16 @@ use passwordpal_lib::commands::auth::{
 
 /// Helper to create a wrapped MEK with a given password
 fn create_wrapped_mek(password: &str, salt_bytes: &[u8], raw_mek: &[u8; 32]) -> String {
+    // 1. Derive KEK
     let kek = derive_test_key(password, salt_bytes);
-    let cipher = Aes256Gcm::new_from_slice(&*kek).unwrap();
+    
+    // 2. Derive EncKey from KEK (BLAKE3)
+    let mut enc_key = Zeroizing::new([0u8; 32]);
+    let derived_enc = blake3::derive_key("passwordpal_enc_v1", &*kek);
+    enc_key.copy_from_slice(&derived_enc);
+
+    // 3. Encrypt MEK with EncKey
+    let cipher = Aes256Gcm::new_from_slice(&*enc_key).unwrap();
     let nonce = Nonce::from_slice(&[0u8; 12]);
     let ciphertext = cipher.encrypt(nonce, raw_mek.as_ref()).unwrap();
 
@@ -58,7 +67,13 @@ fn test_change_password_success() {
     let (new_nonce_bytes, new_ciphertext) = new_wrapped_bytes.split_at(12);
 
     let new_kek = derive_test_key(new_password, &salt_bytes);
-    let new_cipher = Aes256Gcm::new_from_slice(&*new_kek).unwrap();
+    
+    // Derive EncKey
+    let mut new_enc_key = Zeroizing::new([0u8; 32]);
+    let derived_enc = blake3::derive_key("passwordpal_enc_v1", &*new_kek);
+    new_enc_key.copy_from_slice(&derived_enc);
+
+    let new_cipher = Aes256Gcm::new_from_slice(&*new_enc_key).unwrap();
     let new_nonce = Nonce::from_slice(new_nonce_bytes);
 
     let decrypted_mek = new_cipher
@@ -177,7 +192,13 @@ fn test_change_password_multiple_times() {
     let wrapped_bytes = general_purpose::STANDARD.decode(wrapped3).unwrap();
     let (nonce_bytes, ciphertext) = wrapped_bytes.split_at(12);
     let kek3 = derive_test_key(password3, &salt_bytes);
-    let cipher = Aes256Gcm::new_from_slice(&*kek3).unwrap();
+    
+    // Derive EncKey
+    let mut enc_key3 = Zeroizing::new([0u8; 32]);
+    let derived_enc = blake3::derive_key("passwordpal_enc_v1", &*kek3);
+    enc_key3.copy_from_slice(&derived_enc);
+    
+    let cipher = Aes256Gcm::new_from_slice(&*enc_key3).unwrap();
     let nonce = Nonce::from_slice(nonce_bytes);
     let decrypted = cipher.decrypt(nonce, ciphertext).unwrap();
 
@@ -207,7 +228,13 @@ fn test_change_password_with_special_characters() {
     let new_wrapped_bytes = general_purpose::STANDARD.decode(result.unwrap()).unwrap();
     let (nonce_bytes, ciphertext) = new_wrapped_bytes.split_at(12);
     let new_kek = derive_test_key(new_password, &salt_bytes);
-    let cipher = Aes256Gcm::new_from_slice(&*new_kek).unwrap();
+    
+    // Derive EncKey
+    let mut new_enc_key = Zeroizing::new([0u8; 32]);
+    let derived_enc = blake3::derive_key("passwordpal_enc_v1", &*new_kek);
+    new_enc_key.copy_from_slice(&derived_enc);
+
+    let cipher = Aes256Gcm::new_from_slice(&*new_enc_key).unwrap();
     let nonce = Nonce::from_slice(nonce_bytes);
     let decrypted = cipher.decrypt(nonce, ciphertext).unwrap();
 
