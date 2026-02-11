@@ -9,8 +9,12 @@ import {
   Loader2,
 } from "lucide-react";
 import RecoveryKeyModal from "../components/RecoveryKeyModal";
-import { generateRecoveryKey, generateSalt, hashPassword } from "../utils/crypto";
+// import { generateRecoveryKey, generateSalt, hashPassword } from "../utils/crypto"; // Mock utils unused
 import { registerDevice } from "../services/deviceService";
+import { authService } from "../services/authService";
+// import { invoke } from "@tauri-apps/api/core";
+
+// Interface moved to authService.ts
 
 interface RegisterPageProps {
   onNavigate: (view: string) => void;
@@ -67,27 +71,23 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setLoading(true);
 
     try {
-      // Generate salt and hash password
-      const salt = await generateSalt();
-      await hashPassword(masterPassword, salt);
-
-      // Generate recovery key
-      const key = await generateRecoveryKey();
+      // Use AuthService to handle Zero Knowledge Registration
+      const key = await authService.register(email, masterPassword);
       setRecoveryKey(key);
 
-      // TODO: Send registration request to backend
-      // await axiosClient.post('/auth/register', { email, hashedPassword, salt });
-
-      // Register device
+      // Register device (mock for now, but good to keep flow)
       await registerDevice();
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Show recovery key modal
       setShowRecoveryModal(true);
-    } catch (err) {
-      setError("Registration failed. Please try again.");
+    } catch (err: any) {
+      console.error("Registration failed:", err);
+      // specific error handling if backend returns useful message
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError("Registration failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -279,6 +279,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         <RecoveryKeyModal
           recoveryKey={recoveryKey}
           onConfirm={handleRecoveryConfirm}
+          onClose={() => setShowRecoveryModal(false)}
         />
       )}
     </>

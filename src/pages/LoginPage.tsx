@@ -4,6 +4,10 @@
 import { useState } from "react";
 import { Shield, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
+// import { invoke } from "@tauri-apps/api/core";
+import { authService } from "../services/authService";
+
+// interface LoginResponse moved to authService
 
 interface LoginPageProps {
   onNavigate: (view: string) => void;
@@ -25,16 +29,22 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
     setLoading(true);
 
     try {
-      // Simulate API call and crypto verification
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // For demo purposes - in real app this would verify against stored hash
-      // const isValid = await verifyPassword(password, storedHash, storedSalt);
+      // Zero Knowledge Login Flow
+      // 1. Get Params -> 2. Derive Key & Unlock (Rust) -> 3. Authenticate (Backend)
+      await authService.login(email, password);
 
       success("Welcome back! Your vault is unlocked.");
       onNavigate("vault");
-    } catch (err) {
-      notifyError("Invalid credentials");
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      // Distinguish between User Not Found (404), Bad Auth (401), or other
+      if (err.response?.status === 404) {
+        notifyError("User not found");
+      } else if (err.response?.status === 401) {
+        notifyError("Invalid password");
+      } else {
+        notifyError("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
