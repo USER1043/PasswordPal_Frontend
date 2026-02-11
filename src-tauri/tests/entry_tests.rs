@@ -1,5 +1,4 @@
 // Integration tests for entry encryption/decryption
-// Tests moved from src/commands/entry.rs and additional test cases
 
 mod common;
 
@@ -9,7 +8,7 @@ use passwordpal_lib::models::VaultEntry;
 use passwordpal_lib::state::VaultState;
 
 // ============================================================================
-// EXISTING TESTS (moved from entry.rs)
+// TESTS CASES
 // ============================================================================
 
 #[test]
@@ -80,10 +79,6 @@ fn test_decrypt_fail_tampered_data() {
     // It should fail either at base64 decode or GCM decryption (tag verification)
     assert!(result.is_err());
 }
-
-// ============================================================================
-// NEW TESTS (additional coverage)
-// ============================================================================
 
 #[test]
 fn test_decrypt_fail_when_locked() {

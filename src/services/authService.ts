@@ -65,7 +65,7 @@ export const authService = {
         const loginData = await invoke<LoginResponse>('login_vault', {
             password: masterPassword,
             salt,
-            wrapped_mek
+            wrappedMek: wrapped_mek
         });
 
         // 3. Send Auth Hash to Backend to prove identity
