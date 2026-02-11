@@ -39,11 +39,11 @@ pub fn register_vault_logic(
     // 3. Derive KEK from password + salt
     let kek = crypto::derive_kek(&password, &salt)?;
     
-    // 4. Compute AuthHash (SHA-256 of KEK)
-    let auth_hash = crypto::compute_auth_hash(&*kek);
+    // 4. Derive AuthKey and EncKey from KEK using BLAKE3
+    let (auth_key, enc_key) = crypto::derive_keys_from_kek(&*kek);
     
-    // 5. Wrap (Encrypt) MEK with KEK
-    let cipher = Aes256Gcm::new_from_slice(&*kek).map_err(|_| "Failed to create cipher")?;
+    // 5. Wrap (Encrypt) MEK with EncKey (NOT KEK directly)
+    let cipher = Aes256Gcm::new_from_slice(&*enc_key).map_err(|_| "Failed to create cipher")?;
     let mut nonce_bytes = [0u8; 12];
     OsRng.try_fill_bytes(&mut nonce_bytes).map_err(|e| format!("OS RNG failed: {}", e))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
@@ -56,6 +56,9 @@ pub fn register_vault_logic(
     wrapped_mek_bytes.extend_from_slice(&nonce_bytes);
     wrapped_mek_bytes.extend_from_slice(&encrypted_mek);
     
+    // Auth Hash is now the hex-encoded AuthKey
+    let auth_hash = hex::encode(*auth_key);
+
     Ok((RegisterResponse {
         salt: general_purpose::STANDARD.encode(salt),
         wrapped_mek: general_purpose::STANDARD.encode(&wrapped_mek_bytes),
@@ -98,14 +101,17 @@ pub fn login_vault_logic(
         
     // 2. Derive KEK
     let kek = crypto::derive_kek(&password, &salt_bytes)?;
+
+    // 3. Derive AuthKey and EncKey
+    let (auth_key, enc_key) = crypto::derive_keys_from_kek(&*kek);
     
-    // 3. Unwrap MEK
+    // 4. Unwrap MEK using EncKey
     if wrapped_mek_bytes.len() < 12 {
         return Err("Wrapped MEK too short".into());
     }
     let (nonce_bytes, ciphertext) = wrapped_mek_bytes.split_at(12);
     let nonce = Nonce::from_slice(nonce_bytes);
-    let cipher = Aes256Gcm::new_from_slice(&*kek).map_err(|_| "Failed to init cipher")?;
+    let cipher = Aes256Gcm::new_from_slice(&*enc_key).map_err(|_| "Failed to init cipher")?;
     
     let mek_vec = cipher.decrypt(nonce, ciphertext)
         .map_err(|_| "Invalid password or corrupted vault")?;
@@ -114,8 +120,8 @@ pub fn login_vault_logic(
         return Err("Invalid MEK length".into());
     }
     
-    // 5. Compute AuthHash
-    let auth_hash = crypto::compute_auth_hash(&*kek);
+    // 5. Return AuthHash (hex-encoded AuthKey)
+    let auth_hash = hex::encode(*auth_key);
     
     Ok((LoginResponse { auth_hash }, mek_vec))
 }
@@ -157,28 +163,30 @@ pub fn change_password_optimization_logic(
         .decode(salt)
         .map_err(|_| "Invalid base64 salt")?;
 
-    // 2. Derive the Key Encryption Key (KEK) from the old password using shared crypto lib.
+    // 2. Derive Old KEK -> EncKey
     let old_kek = crypto::derive_kek(&old_password, &salt_bytes)?;
+    let (_, old_enc_key) = crypto::derive_keys_from_kek(&*old_kek);
 
-    // 3. Decrypt the Master Encryption Key (MEK) using the old KEK.
+    // 3. Decrypt the Master Encryption Key (MEK) using the Old EncKey
     if stored_wrapped_key_bytes.len() < 12 {
         return Err("Stored wrapped key is too short".into());
     }
     let (nonce_bytes, ciphertext) = stored_wrapped_key_bytes.split_at(12);
     let nonce = Nonce::from_slice(nonce_bytes);
     
-    let cipher_old = Aes256Gcm::new_from_slice(&*old_kek).map_err(|_| "Failed to init cipher with old KEK")?;
+    let cipher_old = Aes256Gcm::new_from_slice(&*old_enc_key).map_err(|_| "Failed to init cipher with old EncKey")?;
     
     // This is the Raw MEK
     let raw_mek = Zeroizing::new(
         cipher_old.decrypt(nonce, ciphertext).map_err(|_| "Failed to decrypt MEK with old password")?
     );
 
-    // 4. Derive the new KEK from the new password.
+    // 4. Derive New KEK -> EncKey
     let new_kek = crypto::derive_kek(&new_password, &salt_bytes)?;
+    let (_, new_enc_key) = crypto::derive_keys_from_kek(&*new_kek);
 
-    // 5. Encrypt the raw MEK with the new KEK.
-    let cipher_new = Aes256Gcm::new_from_slice(&*new_kek).map_err(|_| "Failed to init cipher with new KEK")?;
+    // 5. Encrypt the raw MEK with the New EncKey.
+    let cipher_new = Aes256Gcm::new_from_slice(&*new_enc_key).map_err(|_| "Failed to init cipher with new EncKey")?;
     
     let mut new_nonce_bytes = [0u8; 12];
     OsRng.try_fill_bytes(&mut new_nonce_bytes).map_err(|e| format!("OS RNG failed: {}", e))?;
