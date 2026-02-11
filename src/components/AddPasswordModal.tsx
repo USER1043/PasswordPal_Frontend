@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Save, RefreshCw, Eye, EyeOff, Zap } from "lucide-react";
+import { X, Save, RefreshCw, Eye, EyeOff } from "lucide-react";
 
 interface AddPasswordModalProps {
     isOpen: boolean;
@@ -58,11 +58,12 @@ export default function AddPasswordModal({
 
     const calculateStrength = (pwd: string) => {
         let strength = 0;
-        if (pwd.length >= 8) strength += 25;
-        if (pwd.length >= 12) strength += 25;
-        if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) strength += 25;
-        if (/[0-9]/.test(pwd)) strength += 12.5;
-        if (/[^a-zA-Z0-9]/.test(pwd)) strength += 12.5;
+        if (pwd.length >= 8) strength += 20;
+        if (pwd.length >= 12) strength += 15;
+        if (pwd.length >= 16) strength += 15;
+        if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) strength += 20;
+        if (/[0-9]/.test(pwd)) strength += 15;
+        if (/[^a-zA-Z0-9]/.test(pwd)) strength += 15;
         setPasswordStrength(Math.min(strength, 100));
     };
 
@@ -98,7 +99,7 @@ export default function AddPasswordModal({
 
     const getStrengthLabel = () => {
         if (passwordStrength < 40) return "Weak";
-        if (passwordStrength < 70) return "Medium";
+        if (passwordStrength <= 70) return "Medium";
         return "Strong";
     };
 
