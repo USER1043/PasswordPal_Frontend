@@ -40,13 +40,12 @@ jobs:
       - name: Run React unit tests (vitest + jsdom)
         run: npm test -- --run
         env:
-          # Tauri APIs are not available in jsdom — point to real backend for integration
           VITE_BACKEND_URL: http://localhost:3000
 
       - name: Build web assets (Vite)
         run: npm run build
         env:
-          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL || 'https://passwordpal-backend.onrender.com' }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
 
       - name: Upload web dist artifact
         uses: actions/upload-artifact@v4
@@ -101,8 +100,7 @@ jobs:
 
   # ──────────────────────────────────────────
   # JOB 3: Build Tauri Desktop Binaries
-  # Runs on main branch only (expensive build)
-  # Builds for all 3 platforms in parallel
+  # Runs on main branch only
   # ──────────────────────────────────────────
   build-tauri:
     name: Build Tauri — ${{ matrix.platform }}
@@ -166,8 +164,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
         with:
-          tagName: ''       # Don't auto-create a tag
-          releaseName: ''   # Don't auto-create a release
+          tagName: ''
+          releaseName: ''
 
       - name: Upload platform bundles
         uses: actions/upload-artifact@v4
@@ -182,8 +180,7 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────
-  # JOB 4: Create GitHub Release (main only)
-  # Attaches all platform binaries
+  # JOB 4: Create GitHub Release
   # ──────────────────────────────────────────
   release:
     name: Create GitHub Release
@@ -214,17 +211,8 @@ jobs:
           name: "PasswordPal ${{ steps.tag.outputs.tag }}"
           body: |
             ## Automated Release
-
             **Commit:** `${{ github.sha }}`
             **Branch:** `${{ github.ref_name }}`
-            **Build date:** ${{ github.event.head_commit.timestamp }}
-
-            ### Downloads
-            | Platform | File |
-            |---|---|
-            | 🐧 Linux | `.deb` / `.AppImage` |
-            | 🍎 macOS | `.dmg` |
-            | 🪟 Windows | `.exe` / `.msi` |
           files: release-artifacts/**/*
           draft: false
           prerelease: false
