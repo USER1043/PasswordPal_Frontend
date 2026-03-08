@@ -1,0 +1,249 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+  RUST_TOOLCHAIN: stable
+
+jobs:
+  # ──────────────────────────────────────────
+  # JOB 1: React / TypeScript Tests & Lint
+  # ──────────────────────────────────────────
+  test-react:
+    name: React Unit Tests & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run React unit tests (vitest + jsdom)
+        run: npm test -- --run
+        env:
+          # Tauri APIs are not available in jsdom — point to real backend for integration
+          VITE_BACKEND_URL: http://localhost:3000
+
+      - name: Build web assets (Vite)
+        run: npm run build
+        env:
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL || 'https://passwordpal-backend.onrender.com' }}
+
+      - name: Upload web dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+          retention-days: 7
+
+  # ──────────────────────────────────────────
+  # JOB 2: Rust / Tauri Tests
+  # ──────────────────────────────────────────
+  test-rust:
+    name: Rust Crypto Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy, rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri system dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy lint
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run Rust unit + integration tests
+        working-directory: src-tauri
+        run: cargo test --all
+
+  # ──────────────────────────────────────────
+  # JOB 3: Build Tauri Desktop Binaries
+  # Runs on main branch only (expensive build)
+  # Builds for all 3 platforms in parallel
+  # ──────────────────────────────────────────
+  build-tauri:
+    name: Build Tauri — ${{ matrix.platform }}
+    needs: [test-react, test-rust]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            os_name: linux
+            artifact_name: passwordpal-linux
+          - platform: windows-latest
+            os_name: windows
+            artifact_name: passwordpal-windows
+          - platform: macos-latest
+            os_name: macos
+            artifact_name: passwordpal-macos
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri system dependencies (Linux only)
+        if: matrix.os_name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
+        with:
+          tagName: ''       # Don't auto-create a tag
+          releaseName: ''   # Don't auto-create a release
+
+      - name: Upload platform bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+          retention-days: 30
+
+  # ──────────────────────────────────────────
+  # JOB 4: Create GitHub Release (main only)
+  # Attaches all platform binaries
+  # ──────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-tauri
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+
+      - name: Generate release tag from commit SHA
+        id: tag
+        run: echo "tag=build-$(echo ${{ github.sha }} | cut -c1-8)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "PasswordPal ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## Automated Release
+
+            **Commit:** `${{ github.sha }}`
+            **Branch:** `${{ github.ref_name }}`
+            **Build date:** ${{ github.event.head_commit.timestamp }}
+
+            ### Downloads
+            | Platform | File |
+            |---|---|
+            | 🐧 Linux | `.deb` / `.AppImage` |
+            | 🍎 macOS | `.dmg` |
+            | 🪟 Windows | `.exe` / `.msi` |
+          files: release-artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ──────────────────────────────────────────
+  # JOB 5: Notify on failure
+  # ──────────────────────────────────────────
+  notify-failure:
+    name: Notify on Pipeline Failure
+    runs-on: ubuntu-latest
+    needs: [test-react, test-rust, build-tauri, release]
+    if: failure()
+
+    steps:
+      - name: Post failure notification
+        run: |
+          echo "❌ Frontend pipeline failed"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
