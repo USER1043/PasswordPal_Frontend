@@ -1,97 +1,60 @@
 // ============================================================================
-// src/services/deviceService.ts - Device Management Service
+// Device Management Service — Real API calls to backend
 // ============================================================================
-import axiosClient from "../api/axiosClient";
+import apiClient from "../api/axiosClient";
 
 export interface Device {
     id: string;
-    name: string;
-    type: "windows" | "macos" | "linux";
-    lastActive: string;
-    isCurrent: boolean;
+    device_name: string;
+    last_login: string;
+    user_id: string;
+    isCurrent?: boolean;
 }
 
 /**
  * Get current device information
  */
-export function getCurrentDeviceInfo(): {
-    name: string;
-    type: "windows" | "macos" | "linux";
-} {
-    // Detect OS
+export function getCurrentDeviceInfo(): { name: string; type: string } {
     const platform = navigator.platform.toLowerCase();
-    let type: "windows" | "macos" | "linux" = "windows";
+    let type = "windows";
 
     if (platform.includes("mac")) type = "macos";
     else if (platform.includes("linux")) type = "linux";
 
-    // Generate device name
     const name = `${type.charAt(0).toUpperCase() + type.slice(1)} Desktop`;
-
     return { name, type };
 }
 
 /**
- * Register device on login
- * TODO: Implement actual API call
- */
-export async function registerDevice(): Promise<void> {
-    console.log("[PLACEHOLDER] Registering device...");
-
-    const deviceInfo = getCurrentDeviceInfo();
-
-    // TODO: Implement actual API call
-    // await axiosClient.post('/devices/register', deviceInfo);
-
-    // Mock implementation
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    console.log("Device registered:", deviceInfo);
-}
-
-/**
- * Get list of active devices
- * TODO: Implement actual API call
+ * Fetch all devices for the current user
  */
 export async function getDevices(): Promise<Device[]> {
-    console.log("[PLACEHOLDER] Fetching devices...");
-
-    // TODO: Implement actual API call
-    // const response = await axiosClient.get('/devices');
-    // return response.data;
-
-    // Mock implementation
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const currentDevice = getCurrentDeviceInfo();
-    return [
-        {
-            id: "1",
-            name: currentDevice.name,
-            type: currentDevice.type,
-            lastActive: new Date().toISOString(),
-            isCurrent: true,
-        },
-        {
-            id: "2",
-            name: "Windows Desktop",
-            type: "windows",
-            lastActive: new Date(Date.now() - 86400000).toISOString(),
-            isCurrent: false,
-        },
-    ];
+    try {
+        const response = await apiClient.get("/api/devices");
+        return response.data.devices || response.data || [];
+    } catch (error) {
+        console.error("Failed to fetch devices:", error);
+        return [];
+    }
 }
 
 /**
- * Revoke a specific device
- * TODO: Implement actual API call
+ * Revoke a device session
  */
 export async function revokeDevice(deviceId: string): Promise<void> {
-    console.log("[PLACEHOLDER] Revoking device:", deviceId);
+    await apiClient.post(`/api/devices/${deviceId}/revoke`);
+}
 
-    // TODO: Implement actual API call
-    // await axiosClient.post(`/devices/${deviceId}/revoke`);
-
-    // Mock implementation
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    console.log("Device revoked:", deviceId);
+/**
+ * Register current device after login
+ */
+export async function registerDevice(): Promise<void> {
+    const deviceInfo = getCurrentDeviceInfo();
+    try {
+        await apiClient.post("/api/devices/register", deviceInfo);
+    } catch (error) {
+        // Device registration might not have a dedicated backend endpoint yet
+        // The backend creates device entries during login in auth.js
+        console.warn("Device registration endpoint not available:", error);
+    }
 }
