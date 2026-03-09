@@ -3,8 +3,8 @@
 // ============================================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Search, Plus, Shield, Settings, AlertTriangle,
-  LayoutGrid, List, ChevronRight, Loader2,
+  Search, Plus, Shield, Settings,
+  LayoutGrid, List, Loader2,
 } from "lucide-react";
 import PasswordItem from "../components/PasswordItem";
 import AddPasswordModal, { type PasswordData } from "../components/AddPasswordModal";
@@ -221,29 +221,6 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
                     </span>
                   </button>
                 ))}
-              </div>
-
-              {/* Quick Actions */}
-              <div className="mt-6 pt-6 border-t border-slate-700/50 space-y-2">
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-2">
-                  Quick Actions
-                </div>
-                <button
-                  onClick={() => onNavigate("generator")}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-300 hover:bg-slate-700/50 rounded-xl transition-all"
-                >
-                  <Plus className="w-4 h-4 text-purple-400" />
-                  <span className="text-sm">Password Generator</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
-                </button>
-                <button
-                  onClick={() => onNavigate("security")}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-300 hover:bg-slate-700/50 rounded-xl transition-all"
-                >
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm">Security Dashboard</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
-                </button>
               </div>
             </div>
           </div>
