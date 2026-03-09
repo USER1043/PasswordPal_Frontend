@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { X, Save, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { X, Save, RefreshCw, Eye, EyeOff, AlertTriangle, Loader2 } from "lucide-react";
+import * as breachService from "../services/breachService";
 
 interface AddPasswordModalProps {
     isOpen: boolean;
@@ -16,6 +17,8 @@ export interface PasswordData {
     url?: string;
     folder?: string;
     notes?: string;
+    version?: number;
+    updated_at?: string;
 }
 
 export default function AddPasswordModal({
@@ -39,6 +42,8 @@ export default function AddPasswordModal({
     const [showNewFolderInput, setShowNewFolderInput] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [customFolders, setCustomFolders] = useState<string[]>([]);
+    const [breachWarning, setBreachWarning] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
 
     if (!isOpen) return null;
 
@@ -82,11 +87,34 @@ export default function AddPasswordModal({
         }
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!formData.name || !formData.username || !formData.password) {
             alert("Please fill in required fields");
             return;
         }
+
+        setSaving(true);
+        setBreachWarning(null);
+
+        // Check password against HIBP before saving
+        try {
+            const result = await breachService.checkPasswordBreach(formData.password);
+            if (result.breached) {
+                setBreachWarning(`This password has been found in ${result.count.toLocaleString()} data breaches. Consider using a different password.`);
+                setSaving(false);
+                return; // Don't save breached password on first attempt
+            }
+        } catch {
+            // If breach check fails, proceed with save anyway
+        }
+
+        onSave(formData);
+        setSaving(false);
+        onClose();
+    };
+
+    // Force save even if breached (user clicked Save again after seeing warning)
+    const handleForceSave = () => {
         onSave(formData);
         onClose();
     };
@@ -214,6 +242,17 @@ export default function AddPasswordModal({
                         )}
                     </div>
 
+                    {/* Breach Warning */}
+                    {breachWarning && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-red-400 text-sm font-semibold mb-1">Breached Password Detected</p>
+                                <p className="text-red-300/80 text-sm">{breachWarning}</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* URL */}
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -320,11 +359,16 @@ export default function AddPasswordModal({
                         Cancel
                     </button>
                     <button
-                        onClick={handleSubmit}
-                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg hover:shadow-purple-500/50"
+                        onClick={breachWarning ? handleForceSave : handleSubmit}
+                        disabled={saving}
+                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg hover:shadow-purple-500/50 disabled:opacity-50"
                     >
-                        <Save className="w-5 h-5" />
-                        {editData ? "Update" : "Save"}
+                        {saving ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Save className="w-5 h-5" />
+                        )}
+                        {breachWarning ? "Save Anyway" : (editData ? "Update" : "Save")}
                     </button>
                 </div>
             </div>

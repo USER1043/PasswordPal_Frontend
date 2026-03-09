@@ -1,9 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
-pub mod state;
-pub mod models;
 pub mod commands;
 pub mod crypto;
+pub mod models;
+pub mod state;
 
 use std::sync::Mutex;
 

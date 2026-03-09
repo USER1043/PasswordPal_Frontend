@@ -55,8 +55,8 @@ export default function DeviceManagement() {
         return date.toLocaleDateString();
     };
 
-    const getDeviceIcon = (type: string) => {
-        return Monitor; // Could expand with different icons per OS
+    const getDeviceIcon = () => {
+        return Monitor;
     };
 
     if (loading) {
@@ -78,7 +78,7 @@ export default function DeviceManagement() {
 
             <div className="space-y-3">
                 {devices.map((device) => {
-                    const DeviceIcon = getDeviceIcon(device.type);
+                    const DeviceIcon = getDeviceIcon();
                     return (
                         <div
                             key={device.id}
@@ -92,7 +92,7 @@ export default function DeviceManagement() {
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h3 className="text-white font-semibold">
-                                                {device.name}
+                                                {device.device_name}
                                             </h3>
                                             {device.isCurrent && (
                                                 <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded-full">
@@ -101,7 +101,7 @@ export default function DeviceManagement() {
                                             )}
                                         </div>
                                         <p className="text-slate-400 text-sm mt-1">
-                                            Last active: {formatDate(device.lastActive)}
+                                            Last active: {formatDate(device.last_login)}
                                         </p>
                                     </div>
                                 </div>

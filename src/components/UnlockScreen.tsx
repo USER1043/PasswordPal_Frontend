@@ -26,7 +26,7 @@ export default function UnlockScreen({ onUnlock, onCancel }: UnlockScreenProps) 
 
         try {
             await onUnlock(password);
-        } catch (err) {
+        } catch {
             setError("Invalid password");
         } finally {
             setLoading(false);

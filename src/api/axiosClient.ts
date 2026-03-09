@@ -1,74 +1,90 @@
+// ============================================================================
 // HTTP client for communicating with the backend API
-// Handles authentication cookies and session revocation
+// Handles token refresh, session revocation, and sensitive data wiping
+// ============================================================================
 import axios from "axios";
 import { invoke } from "@tauri-apps/api/core";
 
-// Custom event dispatched when session is revoked (e.g., password changed on another device)
 export const SESSION_REVOKED_EVENT = "session-revoked";
 
-// Create axios instance configured for our backend
 const apiClient = axios.create({
-  baseURL: "http://localhost:3000", // Replace with actual API URL or config
+  baseURL: "http://localhost:3000",
   withCredentials: true,
 });
 
-
-// Securely wipes encryption keys from memory when user logs out or session expires
+/** Wipe encryption keys from Rust memory */
 export const wipe_sensitive_data = async () => {
   try {
-    console.log("Wiping sensitive data from RAM...");
-    // Call the Rust command to lock and wipe the vault from memory
     await invoke("lock_vault");
-    // Clear any frontend sensitive state if present (localStorage/sessionStorage usually shouldn't hold secrets, but wipe tokens if needed)
-    // localStorage.removeItem('token'); // usage depends on auth implementation
-    console.log("Sensitive data wiped.");
   } catch (error) {
     console.error("Failed to wipe sensitive data:", error);
   }
 };
 
+let isRefreshing = false;
+let refreshSubscribers: ((success: boolean) => void)[] = [];
 
-// Intercept API responses to handle session expiration
+function onRefreshed(success: boolean) {
+  refreshSubscribers.forEach((cb) => cb(success));
+  refreshSubscribers = [];
+}
+
 apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Detect 401 Unauthorized
-    // The prompt says "Server responds with 401 Unauthorized (Token Stale)" mechanism
-    if (error.response && error.response.status === 401) {
-      // We can check for specific message if needed, e.g. error.response.data.message === "Token Stale"
-      // For now, we treat 401 as revocation as requested for the global flow
-
-      // Prevent infinite loop if the retry was attempted (though we are NOT retrying here)
-      // The prompt says: "Does not try to auto-refresh the token (break the loop)."
-      // So we strictly DO NOT try to refresh.
-
-      if (!originalRequest._retry) {
-        originalRequest._retry = true; // Mark as handled to avoid loops if other mechanisms exist
-
-        // 1. Wipe sensitive keys from RAM
-        await wipe_sensitive_data();
-
-        // 2. Redirect to Login Screen with message
-        // Since we are outside React components, we dispatch an event
-        const event = new CustomEvent(SESSION_REVOKED_EVENT, {
-          detail: {
-            message:
-              "Your password was changed on another device. Please log in again.",
-          },
-        });
-        window.dispatchEvent(event);
-
-        // Rejection is handled by the component consuming this promise (likely showing an error or just being unmounted)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't try to refresh the refresh call itself
+      if (originalRequest.url?.includes("/auth/refresh") ||
+        originalRequest.url?.includes("/auth/login") ||
+        originalRequest.url?.includes("/auth/register")) {
         return Promise.reject(error);
+      }
+
+      originalRequest._retry = true;
+
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          await axios.post("http://localhost:3000/auth/refresh", null, {
+            withCredentials: true,
+          });
+          isRefreshing = false;
+          onRefreshed(true);
+          // Retry original request
+          return apiClient(originalRequest);
+        } catch {
+          isRefreshing = false;
+          onRefreshed(false);
+
+          // Refresh failed — wipe and redirect
+          await wipe_sensitive_data();
+          const event = new CustomEvent(SESSION_REVOKED_EVENT, {
+            detail: {
+              message:
+                "Your session has expired. Please log in again.",
+            },
+          });
+          window.dispatchEvent(event);
+          return Promise.reject(error);
+        }
+      } else {
+        // Another refresh is in progress — wait for it
+        return new Promise((resolve, reject) => {
+          refreshSubscribers.push((success: boolean) => {
+            if (success) {
+              resolve(apiClient(originalRequest));
+            } else {
+              reject(error);
+            }
+          });
+        });
       }
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export default apiClient;

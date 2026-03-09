@@ -1,73 +1,185 @@
-// Main app component - handles routing between login/register and authenticated pages
-import { useState, useEffect } from "react";
-// Removed Navbar since we have Sidebar now for authenticated pages
-import AppLayout from "./components/AppLayout";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import VaultPage from "./pages/VaultPage";
-import SecurityDashboardPage from "./pages/SecurityDashboardPage";
-import PasswordGeneratorPage from "./pages/PasswordGeneratorPage";
-import SettingsPage from "./pages/SettingsPage";
-import { SESSION_REVOKED_EVENT } from "./api/axiosClient";
+// ============================================================================
+// App.tsx — Main application with session management and auto-lock
+// ============================================================================
+import { useState, useEffect, useCallback, useRef } from "react";
 import { NotificationProvider } from "./context/NotificationContext";
 import ToastContainer from "./components/ToastContainer";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import RecoveryPage from "./pages/RecoveryPage";
+import VaultPage from "./pages/VaultPage";
+import SettingsPage from "./pages/SettingsPage";
+import SecurityDashboardPage from "./pages/SecurityDashboardPage";
+import PasswordGeneratorPage from "./pages/PasswordGeneratorPage";
+import AuditLogPage from "./pages/AuditLogPage";
+import AppLayout from "./components/AppLayout";
+import UnlockScreen from "./components/UnlockScreen";
+import { SESSION_REVOKED_EVENT, wipe_sensitive_data } from "./api/axiosClient";
+import { invoke } from "@tauri-apps/api/core";
+import { authService } from "./services/authService";
 
-export default function App() {
+const AUTO_LOCK_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const CLIPBOARD_CLEAR_TIMEOUT_MS = 30 * 1000; // 30 seconds
+
+function App() {
   const [currentView, setCurrentView] = useState("login");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [isLocked, setIsLocked] = useState(false);
+  const autoLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Auto-lock: Reset timer on user activity
+  const resetAutoLockTimer = useCallback(() => {
+    if (autoLockTimerRef.current) {
+      clearTimeout(autoLockTimerRef.current);
+    }
+    // Only set timer if user is on an authenticated view
+    if (!["login", "register"].includes(currentView)) {
+      autoLockTimerRef.current = setTimeout(async () => {
+        await wipe_sensitive_data();
+        setIsLocked(true);
+      }, AUTO_LOCK_TIMEOUT_MS);
+    }
+  }, [currentView]);
+
+  // Set up activity listeners for auto-lock
   useEffect(() => {
-    // Need to handle session revocation here or inside a child component that uses the notification context
-    // Ideally, we move the listener inside a child component of NotificationProvider or use a ref access
+    const events = ["mousedown", "keydown", "scroll", "touchstart"];
+    const handler = () => resetAutoLockTimer();
+
+    events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
+    resetAutoLockTimer();
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, handler));
+      if (autoLockTimerRef.current) clearTimeout(autoLockTimerRef.current);
+    };
+  }, [resetAutoLockTimer]);
+
+  // Listen for session revocation events from axiosClient
+  useEffect(() => {
+    const handler = () => {
+      setUserEmail("");
+      setCurrentView("login");
+    };
+    window.addEventListener(SESSION_REVOKED_EVENT, handler);
+    return () => window.removeEventListener(SESSION_REVOKED_EVENT, handler);
   }, []);
 
-  // Wrapper component to handle notifications dependent on context
-  const AppContent = () => {
-    const [showAddPasswordModal, setShowAddPasswordModal] = useState(false);
+  // Clipboard auto-clear
+  useEffect(() => {
+    const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
 
-    const handleNavigate = (view: string) => {
-      setCurrentView(view);
+    navigator.clipboard.writeText = async (text: string) => {
+      await originalWriteText(text);
+
+      if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+      clipboardTimerRef.current = setTimeout(async () => {
+        try {
+          await originalWriteText("");
+        } catch {
+          // Clipboard clear may fail if window not focused
+        }
+      }, CLIPBOARD_CLEAR_TIMEOUT_MS);
     };
 
-    const handleAddPassword = () => {
-      // Ensure we're on the vault page and open the modal
-      if (currentView !== "vault") {
-        setCurrentView("vault");
-      }
-      setShowAddPasswordModal(true);
+    return () => {
+      if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
     };
+  }, []);
 
-    // Views that are part of the "Authenticated App"
-    const isAuthView = ["vault", "security", "generator", "settings"].includes(currentView);
+  const handleNavigate = (view: string) => {
+    setCurrentView(view);
+    setShowAddModal(false);
+  };
+
+  // Handle vault unlock after auto-lock
+  const handleUnlock = async (password: string) => {
+    // Re-derive keys and unlock vault via Rust
+    const { salt, wrapped_mek } = await authService.getParams(userEmail);
+    await invoke("login_vault", { password, salt, wrappedMek: wrapped_mek });
+    setIsLocked(false);
+    resetAutoLockTimer();
+  };
+
+  // Handle logout from unlock screen
+  const handleUnlockCancel = () => {
+    setIsLocked(false);
+    setUserEmail("");
+    setCurrentView("login");
+  };
+
+  const renderContent = () => {
+    if (currentView === "login") {
+      return <LoginPage onNavigate={handleNavigate} onLoginSuccess={(email: string) => setUserEmail(email)} />;
+    }
+
+    if (currentView === "register") {
+      return <RegisterPage onNavigate={handleNavigate} />;
+    }
+
+    if (currentView === "recovery") {
+      return <RecoveryPage onNavigate={handleNavigate} />;
+    }
+
+    // Authenticated views wrapped in AppLayout
+    let pageContent;
+    switch (currentView) {
+      case "vault":
+        pageContent = (
+          <VaultPage
+            onNavigate={handleNavigate}
+            showAddModal={showAddModal}
+            setShowAddModal={setShowAddModal}
+          />
+        );
+        break;
+      case "settings":
+        pageContent = <SettingsPage onNavigate={handleNavigate} userEmail={userEmail} />;
+        break;
+      case "security":
+        pageContent = <SecurityDashboardPage onNavigate={handleNavigate} />;
+        break;
+      case "generator":
+        pageContent = <PasswordGeneratorPage onNavigate={handleNavigate} />;
+        break;
+      case "audit-log":
+        pageContent = <AuditLogPage onNavigate={handleNavigate} />;
+        break;
+      default:
+        pageContent = (
+          <VaultPage
+            onNavigate={handleNavigate}
+            showAddModal={showAddModal}
+            setShowAddModal={setShowAddModal}
+          />
+        );
+    }
 
     return (
-      <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-purple-500/30">
-        <ToastContainer />
-        {!isAuthView ? (
-          <>
-            {currentView === "login" && <LoginPage onNavigate={handleNavigate} />}
-            {currentView === "register" && <RegisterPage onNavigate={handleNavigate} />}
-          </>
-        ) : (
-          <AppLayout currentView={currentView} onNavigate={handleNavigate} onAddPassword={handleAddPassword}>
-            {currentView === "vault" && (
-              <VaultPage
-                onNavigate={handleNavigate}
-                showAddModal={showAddPasswordModal}
-                setShowAddModal={setShowAddPasswordModal}
-              />
-            )}
-            {currentView === "security" && <SecurityDashboardPage onNavigate={handleNavigate} />}
-            {currentView === "generator" && <PasswordGeneratorPage onNavigate={handleNavigate} />}
-            {currentView === "settings" && <SettingsPage onNavigate={handleNavigate} />}
-          </AppLayout>
-        )}
-      </div>
+      <AppLayout
+        currentView={currentView}
+        onNavigate={handleNavigate}
+        onAddPassword={() => setShowAddModal(true)}
+      >
+        {pageContent}
+      </AppLayout>
     );
   };
 
   return (
     <NotificationProvider>
-      <AppContent />
+      {isLocked && (
+        <UnlockScreen
+          onUnlock={handleUnlock}
+          onCancel={handleUnlockCancel}
+        />
+      )}
+      {renderContent()}
+      <ToastContainer />
     </NotificationProvider>
   );
 }
+
+export default App;

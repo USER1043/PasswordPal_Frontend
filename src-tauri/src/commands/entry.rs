@@ -91,7 +91,7 @@ pub fn decrypt_entry_logic(st: &VaultState, blob_b64: &str) -> Result<VaultEntry
     let nonce = Nonce::from_slice(nonce_bytes);
 
     let cipher =
-        Aes256Gcm::new_from_slice(&key_bytes).map_err(|_| "Failed to initialize cipher")?;
+        Aes256Gcm::new_from_slice(key_bytes).map_err(|_| "Failed to initialize cipher")?;
 
     // Decrypt the data. The underlying implementation verifies the authentication tag to ensure integrity.
     let plaintext_bytes = cipher

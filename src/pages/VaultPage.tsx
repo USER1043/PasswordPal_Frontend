@@ -1,17 +1,16 @@
-// Password vault page - displays all saved passwords with search and folder filtering
-import { useState } from "react";
+// ============================================================================
+// VaultPage — Real encrypted vault data from backend via Rust decryption
+// ============================================================================
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Search,
-  Plus,
-  Shield,
-  Settings,
-  AlertTriangle,
-  LayoutGrid,
-  List,
-  ChevronRight,
+  Search, Plus, Shield, Settings, AlertTriangle,
+  LayoutGrid, List, ChevronRight, Loader2,
 } from "lucide-react";
 import PasswordItem from "../components/PasswordItem";
 import AddPasswordModal, { type PasswordData } from "../components/AddPasswordModal";
+import * as vaultService from "../services/vaultService";
+import type { DecryptedVaultItem, VaultEntry } from "../services/vaultService";
+import { useNotification } from "../context/NotificationContext";
 
 interface VaultPageProps {
   onNavigate: (view: string) => void;
@@ -19,69 +18,74 @@ interface VaultPageProps {
   setShowAddModal: (show: boolean) => void;
 }
 
+/** Convert a DecryptedVaultItem to the PasswordData shape the UI components expect */
+function toPasswordData(item: DecryptedVaultItem): PasswordData {
+  return {
+    id: item.id,
+    name: item.name,
+    username: item.username,
+    password: item.password,
+    url: item.website_url,
+    folder: item.folder_name,
+    notes: item.notes,
+    version: item.version,
+    updated_at: item.updated_at,
+  };
+}
+
+/** Convert PasswordData from the form to a VaultEntry for Rust encryption */
+function toVaultEntry(data: PasswordData): VaultEntry {
+  return {
+    name: data.name,
+    username: data.username,
+    password: data.password,
+    website_url: data.url || "",
+    folder_name: data.folder || "",
+    tags: [],
+    notes: data.notes || "",
+  };
+}
+
 export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }: VaultPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFolder, setSelectedFolder] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [editingPassword, setEditingPassword] = useState<PasswordData | null>(
-    null
-  );
+  const [editingPassword, setEditingPassword] = useState<PasswordData | null>(null);
+  const [passwords, setPasswords] = useState<PasswordData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { success, error: notifyError } = useNotification();
 
-  // Mock data - replace with real data from crypto service
-  const [passwords, setPasswords] = useState<PasswordData[]>([
-    {
-      id: "1",
-      name: "GitHub",
-      username: "user@example.com",
-      password: "SuperSecret123!",
-      url: "https://github.com",
-      folder: "Work",
-      notes: "Development account",
-    },
-    {
-      id: "2",
-      name: "Gmail",
-      username: "myemail@gmail.com",
-      password: "AnotherPass456@",
-      url: "https://gmail.com",
-      folder: "Personal",
-    },
-    {
-      id: "3",
-      name: "Netflix",
-      username: "streaming@email.com",
-      password: "MovieTime789#",
-      url: "https://netflix.com",
-      folder: "Personal",
-    },
-  ]);
+  // Use refs for notification functions to avoid re-triggering loadVault
+  const notifyErrorRef = useRef(notifyError);
+  notifyErrorRef.current = notifyError;
 
+  const loadVault = useCallback(async () => {
+    setLoading(true);
+    try {
+      const items = await vaultService.fetchVault();
+      setPasswords(items.map(toPasswordData));
+    } catch (err: unknown) {
+      console.error("Failed to load vault:", err);
+      notifyErrorRef.current("Failed to load vault data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadVault();
+  }, [loadVault]);
+
+  // Derive folders dynamically from actual data
+  const folderNames = [...new Set(passwords.map((p) => p.folder).filter(Boolean))] as string[];
   const folders = [
     { id: "all", name: "All Items", count: passwords.length, icon: "🔐" },
-    {
-      id: "personal",
-      name: "Personal",
-      count: passwords.filter((p) => p.folder === "Personal").length,
-      icon: "👤",
-    },
-    {
-      id: "work",
-      name: "Work",
-      count: passwords.filter((p) => p.folder === "Work").length,
-      icon: "💼",
-    },
-    {
-      id: "finance",
-      name: "Finance",
-      count: passwords.filter((p) => p.folder === "Finance").length,
-      icon: "💰",
-    },
-    {
-      id: "social",
-      name: "Social",
-      count: passwords.filter((p) => p.folder === "Social").length,
-      icon: "🌐",
-    },
+    ...folderNames.map((f) => ({
+      id: f.toLowerCase(),
+      name: f,
+      count: passwords.filter((p) => p.folder === f).length,
+      icon: f === "Work" ? "💼" : f === "Finance" ? "💰" : f === "Social" ? "🌐" : "👤",
+    })),
   ];
 
   const filteredPasswords = passwords.filter((pwd) => {
@@ -94,18 +98,26 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     return matchesSearch && matchesFolder;
   });
 
-  const handleSavePassword = (data: PasswordData) => {
-    if (editingPassword) {
-      // Update existing
-      setPasswords(
-        passwords.map((p) => (p.id === editingPassword.id ? { ...data, id: p.id } : p))
-      );
+  const handleSavePassword = async (data: PasswordData) => {
+    try {
+      const entry = toVaultEntry(data);
+      if (editingPassword?.id) {
+        await vaultService.saveEntry(entry, editingPassword.id, (editingPassword as unknown as { version?: number }).version);
+      } else {
+        await vaultService.saveEntry(entry);
+      }
       setEditingPassword(null);
-    } else {
-      // Add new
-      setPasswords([...passwords, { ...data, id: Date.now().toString() }]);
+      setShowAddModal(false);
+      success(editingPassword ? "Password updated" : "Password saved");
+      await loadVault();
+    } catch (err: unknown) {
+      console.error("Save failed:", err);
+      if ((err as { response?: { status?: number } }).response?.status === 409) {
+        notifyError("Version conflict — someone else modified this entry. Please refresh.");
+      } else {
+        notifyError("Failed to save password");
+      }
     }
-    setShowAddModal(false);
   };
 
   const handleEdit = (id: string) => {
@@ -116,20 +128,34 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this password?")) {
-      setPasswords(passwords.filter((p) => p.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this password?")) return;
+    try {
+      await vaultService.deleteEntry(id);
+      success("Password deleted");
+      await loadVault();
+    } catch (err) {
+      console.error("Delete failed:", err);
+      notifyError("Failed to delete password");
     }
   };
 
-  const getRelativeTime = () => {
-    const times = ["2 days ago", "1 week ago", "3 weeks ago", "1 month ago"];
-    return times[Math.floor(Math.random() * times.length)];
+  const formatRelativeTime = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays < 1) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Top Navigation Bar */}
+      {/* Top Nav */}
       <div className="bg-slate-800/50 backdrop-blur-xl border-b border-slate-700/50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -137,7 +163,6 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
               <Shield className="w-8 h-8 text-purple-400" />
               <h1 className="text-2xl font-bold text-white">My Vault</h1>
             </div>
-
             <div className="flex items-center gap-3">
               <button
                 onClick={() => onNavigate("settings")}
@@ -160,10 +185,12 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
               <div className="mb-6 p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl">
                 <div className="flex items-center gap-3 mb-2">
                   <Shield className="w-5 h-5 text-purple-400" />
-                  <span className="text-white font-semibold">Security Score</span>
+                  <span className="text-white font-semibold">Vault Items</span>
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">78%</div>
-                <div className="text-xs text-slate-400">Good - Keep improving</div>
+                <div className="text-3xl font-bold text-white mb-1">{passwords.length}</div>
+                <div className="text-xs text-slate-400">
+                  {passwords.length === 0 ? "Add your first password" : "Secured credentials"}
+                </div>
               </div>
 
               {/* Folders */}
@@ -215,9 +242,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
                 >
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
                   <span className="text-sm">Security Dashboard</span>
-                  <span className="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
-                    4
-                  </span>
+                  <ChevronRight className="w-4 h-4 ml-auto" />
                 </button>
               </div>
             </div>
@@ -225,7 +250,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
 
           {/* Main Content */}
           <div className="col-span-9">
-            {/* Search and Actions Bar */}
+            {/* Search Bar */}
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -237,7 +262,6 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
                   className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl pl-12 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                 />
               </div>
-
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setViewMode("list")}
@@ -245,7 +269,6 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                     : "bg-slate-800/50 text-slate-400 hover:text-white border border-slate-700/50"
                     }`}
-                  title="List view - View passwords in a detailed list"
                 >
                   <List className="w-5 h-5" />
                 </button>
@@ -255,12 +278,10 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                     : "bg-slate-800/50 text-slate-400 hover:text-white border border-slate-700/50"
                     }`}
-                  title="Grid view - View passwords in a compact grid"
                 >
                   <LayoutGrid className="w-5 h-5" />
                 </button>
               </div>
-
               <button
                 onClick={() => {
                   setEditingPassword(null);
@@ -273,78 +294,81 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
               </button>
             </div>
 
-            {/* Password List */}
-            <div>
-              {filteredPasswords.length === 0 ? (
-                <div className="text-center py-20">
-                  <Shield className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-400 mb-2">
-                    No passwords found
-                  </h3>
-                  <p className="text-slate-500 mb-6">
-                    {searchQuery
-                      ? "Try a different search term"
-                      : "Add your first password to get started"}
-                  </p>
-                  {!searchQuery && (
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-all"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Add Your First Password
-                    </button>
-                  )}
+            {/* Content */}
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
+                <span className="ml-4 text-slate-400 text-lg">Decrypting vault...</span>
+              </div>
+            ) : filteredPasswords.length === 0 ? (
+              <div className="text-center py-20">
+                <Shield className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-400 mb-2">
+                  No passwords found
+                </h3>
+                <p className="text-slate-500 mb-6">
+                  {searchQuery
+                    ? "Try a different search term"
+                    : "Add your first password to get started"}
+                </p>
+                {!searchQuery && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-all"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Your First Password
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-slate-400 mb-4">
+                  {filteredPasswords.length} password
+                  {filteredPasswords.length !== 1 ? "s" : ""} found
                 </div>
-              ) : (
-                <>
-                  <div className="text-sm text-slate-400 mb-4">
-                    {filteredPasswords.length} password
-                    {filteredPasswords.length !== 1 ? "s" : ""} found
+                {viewMode === "list" ? (
+                  <div className="space-y-3">
+                    {filteredPasswords.map((pwd) => (
+                      <PasswordItem
+                        key={pwd.id}
+                        id={pwd.id!}
+                        name={pwd.name}
+                        username={pwd.username}
+                        password={pwd.password}
+                        url={pwd.url}
+                        folder={pwd.folder}
+                        lastModified={formatRelativeTime(pwd.updated_at)}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    ))}
                   </div>
-                  {viewMode === "list" ? (
-                    <div className="space-y-3">
-                      {filteredPasswords.map((pwd) => (
-                        <PasswordItem
-                          key={pwd.id}
-                          id={pwd.id!}
-                          name={pwd.name}
-                          username={pwd.username}
-                          password={pwd.password}
-                          url={pwd.url}
-                          folder={pwd.folder}
-                          lastModified={getRelativeTime()}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {filteredPasswords.map((pwd) => (
-                        <PasswordItem
-                          key={pwd.id}
-                          id={pwd.id!}
-                          name={pwd.name}
-                          username={pwd.username}
-                          password={pwd.password}
-                          url={pwd.url}
-                          folder={pwd.folder}
-                          lastModified={getRelativeTime()}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {filteredPasswords.map((pwd) => (
+                      <PasswordItem
+                        key={pwd.id}
+                        id={pwd.id!}
+                        name={pwd.name}
+                        username={pwd.username}
+                        password={pwd.password}
+                        url={pwd.url}
+                        folder={pwd.folder}
+                        lastModified={formatRelativeTime(pwd.updated_at)}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Add/Edit Password Modal */}
+      {/* Modal */}
       <AddPasswordModal
         isOpen={showAddModal}
         onClose={() => {

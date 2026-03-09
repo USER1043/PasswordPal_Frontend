@@ -46,9 +46,10 @@ fn test_unlock_vault_wrong_length() {
 #[test]
 fn test_lock_vault() {
     // Create a new vault state
-    let mut state = VaultState::default();
-    state.enc_key = Some(vec![0; 32]);
-    state.unlocked = true;
+    let mut state = VaultState {
+        enc_key: Some(vec![0; 32]),
+        unlocked: true,
+    };
 
     lock_vault_logic(&mut state);
     // Check if the vault is locked and the enc key is wiped

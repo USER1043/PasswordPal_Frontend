@@ -1,13 +1,10 @@
-// Main navigation sidebar - shows app logo, menu items, and sign out button
+// ============================================================================
+// Sidebar — Main navigation with real logout via backend + Rust
+// ============================================================================
 import {
-    Shield,
-    Lock,
-    Zap,
-    Settings,
-    LogOut,
-    Plus
+    Shield, Lock, Zap, Settings, LogOut, Plus, History
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { authService } from "../services/authService";
 
 interface SidebarProps {
     currentView: string;
@@ -20,8 +17,19 @@ export default function Sidebar({ currentView, onNavigate, onAddPassword }: Side
         { id: "vault", label: "My Vault", icon: Lock },
         { id: "generator", label: "Generator", icon: Zap },
         { id: "security", label: "Security", icon: Shield },
+        { id: "audit-log", label: "Audit Log", icon: History },
         { id: "settings", label: "Settings", icon: Settings },
     ];
+
+    const handleSignOut = async () => {
+        try {
+            await authService.logout();
+        } catch (error) {
+            console.error("Logout error:", error);
+        } finally {
+            onNavigate("login");
+        }
+    };
 
     return (
         <div className="w-64 bg-slate-800/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col h-full">
@@ -77,16 +85,7 @@ export default function Sidebar({ currentView, onNavigate, onAddPassword }: Side
             {/* User Footer */}
             <div className="p-4 border-t border-slate-700/50">
                 <button
-                    onClick={async () => {
-                        try {
-                            await invoke("lock_vault");
-                            console.log("Vault locked successfully");
-                        } catch (error) {
-                            console.error("Failed to lock vault:", error);
-                        } finally {
-                            onNavigate("login");
-                        }
-                    }}
+                    onClick={handleSignOut}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-colors group"
                 >
                     <LogOut className="w-5 h-5 group-hover:text-red-400 transition-colors" />
