@@ -300,8 +300,8 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                   type="text"
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value.replace(/\s/g, ""))}
-                  placeholder={useBackupCode ? "XXXX-XXXX" : "000000"}
-                  maxLength={useBackupCode ? 9 : 6}
+                  placeholder={useBackupCode ? "XXXXXXXXXX" : "000000"}
+                  maxLength={useBackupCode ? 10 : 6}
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && handleMfaVerify()}
                   className="w-full bg-slate-950/50 border border-purple-500/30 rounded-xl px-4 py-4 text-white text-center text-2xl font-mono tracking-[0.3em] placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
