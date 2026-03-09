@@ -441,18 +441,47 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
     const doExport = async () => {
         setExportLoading(true);
         try {
-            const response = await apiClient.post("/api/export");
-            const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: "application/json" });
+            const { fetchVault } = await import("../services/vaultService");
+            const items = await fetchVault();
+            if (items.length === 0) {
+                notifyError("Your vault is empty. Nothing to export.");
+                setExportLoading(false);
+                return;
+            }
+
+            // Generate CSV matching import format: Name, Username, Password, URL, Folder, Notes
+            const headers = ["Name", "Username", "Password", "URL", "Folder", "Notes"];
+            const escapeCSV = (val: string | undefined | null) => {
+                if (!val) return '""';
+                const s = String(val);
+                return s.includes(',') || s.includes('"') || s.includes('\n')
+                    ? `"${s.replace(/"/g, '""')}"`
+                    : `"${s}"`; // Quote everything to be safe
+            };
+
+            const csvRows = items.map(item => [
+                escapeCSV(item.name),
+                escapeCSV(item.username),
+                escapeCSV(item.password),
+                escapeCSV(item.website_url),
+                escapeCSV(item.folder_name),
+                escapeCSV(item.notes)
+            ].join(','));
+
+            const csvContent = [headers.join(','), ...csvRows].join('\n');
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `passwordpal-export-${Date.now()}.json`;
+            a.download = `passwordpal-export-${Date.now()}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            success("Vault exported successfully");
+
+            success(`Exported ${items.length} passwords to CSV`);
         } catch (err: unknown) {
+            console.error("Export failed:", err);
             if ((err as { response?: { status?: number } }).response?.status === 403) {
                 setPendingAction("export");
                 setShowReauthModal(true);
