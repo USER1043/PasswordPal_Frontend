@@ -65,7 +65,7 @@ pub fn register_vault_logic(password: String) -> Result<(RegisterResponse, Vec<u
             salt: general_purpose::STANDARD.encode(salt),
             wrapped_mek: general_purpose::STANDARD.encode(&wrapped_mek_bytes),
             auth_hash,
-            recovery_key: general_purpose::STANDARD.encode(&*mek),
+            recovery_key: general_purpose::STANDARD.encode(*mek),
         },
         mek.to_vec(),
     ))
