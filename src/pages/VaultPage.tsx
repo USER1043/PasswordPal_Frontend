@@ -91,7 +91,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
   const filteredPasswords = passwords.filter((pwd) => {
     const matchesSearch =
       pwd.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pwd.username.toLowerCase().includes(searchQuery.toLowerCase());
+      (pwd.url ? pwd.url.toLowerCase().includes(searchQuery.toLowerCase()) : false);
     const matchesFolder =
       selectedFolder === "all" ||
       pwd.folder?.toLowerCase() === selectedFolder.toLowerCase();
@@ -102,7 +102,9 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     try {
       const entry = toVaultEntry(data);
       if (editingPassword?.id) {
-        await vaultService.saveEntry(entry, editingPassword.id, (editingPassword as unknown as { version?: number }).version);
+        // Must explicitly pass the version from the original editingPassword tracking state
+        // data.version from the modal might be undefined if not strictly passed through
+        await vaultService.saveEntry(entry, editingPassword.id, editingPassword.version);
       } else {
         await vaultService.saveEntry(entry);
       }
