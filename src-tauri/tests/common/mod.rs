@@ -1,12 +1,12 @@
 // Common test utilities and helpers for integration tests
 #![allow(dead_code)]
 
-use base64::{engine::general_purpose, Engine as _};
-use zeroize::Zeroizing;
 use argon2::{
     password_hash::{PasswordHasher, Salt},
     Argon2,
 };
+use base64::{engine::general_purpose, Engine as _};
+use zeroize::Zeroizing;
 
 /// Creates a test encryption key (32 bytes of zeros)
 pub fn get_test_key() -> Vec<u8> {
