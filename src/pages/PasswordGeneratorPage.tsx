@@ -9,7 +9,7 @@ import {
     Eye,
     EyeOff,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface PasswordGeneratorPageProps {
     onNavigate: (view: string) => void;
@@ -30,7 +30,24 @@ export default function PasswordGeneratorPage({
     const [showPassword, setShowPassword] = useState(true);
     const [strength, setStrength] = useState(0);
 
-    const generatePassword = () => {
+    const calculateStrength = useCallback((pwd: string) => {
+        let score = 0;
+
+        // Length score
+        if (pwd.length >= 8) score += 20;
+        if (pwd.length >= 12) score += 20;
+        if (pwd.length >= 16) score += 20;
+
+        // Character variety
+        if (/[a-z]/.test(pwd)) score += 10;
+        if (/[A-Z]/.test(pwd)) score += 10;
+        if (/[0-9]/.test(pwd)) score += 10;
+        if (/[^a-zA-Z0-9]/.test(pwd)) score += 10;
+
+        setStrength(Math.min(score, 100));
+    }, []);
+
+    const generatePassword = useCallback(() => {
         let charset = "";
         let newPassword = "";
 
@@ -65,24 +82,8 @@ export default function PasswordGeneratorPage({
 
         setPassword(newPassword);
         calculateStrength(newPassword);
-    };
+    }, [length, includeUppercase, includeLowercase, includeNumbers, includeSymbols, excludeSimilar, excludeAmbiguous, calculateStrength]);
 
-    const calculateStrength = (pwd: string) => {
-        let score = 0;
-
-        // Length score
-        if (pwd.length >= 8) score += 20;
-        if (pwd.length >= 12) score += 20;
-        if (pwd.length >= 16) score += 20;
-
-        // Character variety
-        if (/[a-z]/.test(pwd)) score += 10;
-        if (/[A-Z]/.test(pwd)) score += 10;
-        if (/[0-9]/.test(pwd)) score += 10;
-        if (/[^a-zA-Z0-9]/.test(pwd)) score += 10;
-
-        setStrength(Math.min(score, 100));
-    };
 
     const handleCopy = async () => {
         if (password && password !== "Please select at least one character type") {
@@ -106,23 +107,10 @@ export default function PasswordGeneratorPage({
         return "from-emerald-500 to-green-500";
     };
 
-    // Generate initial password
+    // Generate initial password and regenerate when options change
     useEffect(() => {
         generatePassword();
-    }, []);
-
-    // Regenerate when options change
-    useEffect(() => {
-        if (password) generatePassword();
-    }, [
-        length,
-        includeUppercase,
-        includeLowercase,
-        includeNumbers,
-        includeSymbols,
-        excludeSimilar,
-        excludeAmbiguous,
-    ]);
+    }, [generatePassword]);
 
     const strengthInfo = getStrengthLabel();
 

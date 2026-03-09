@@ -80,11 +80,12 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       // Show recovery key modal
       setShowRecoveryModal(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Registration failed:", err);
       // specific error handling if backend returns useful message
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      if (axiosErr.response?.data?.error) {
+        setError(axiosErr.response.data.error);
       } else {
         setError("Registration failed. Please try again.");
       }

@@ -38,7 +38,8 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
         try {
             // 1. Get salt from backend
             const paramsRes = await apiClient.get("/auth/params", { params: { email } });
-            const { salt } = paramsRes.data;
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { salt: _salt } = paramsRes.data;
 
             // 2. The recovery key IS the raw MEK (base64). We need to re-wrap it with the new password.
             //    Use Rust to generate new auth credentials with the new password
@@ -62,11 +63,11 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
 
             success("Account recovered! Please log in with your new password.");
             onNavigate("login");
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Recovery error:", err);
-            if (err.response?.status === 404) {
+            if ((err as { response?: { status?: number } }).response?.status === 404) {
                 notifyError("Account not found");
-            } else if (err.response?.status === 401) {
+            } else if ((err as { response?: { status?: number } }).response?.status === 401) {
                 notifyError("Invalid recovery key");
             } else {
                 notifyError("Recovery failed. Please check your recovery key.");

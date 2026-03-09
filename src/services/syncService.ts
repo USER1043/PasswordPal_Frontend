@@ -104,11 +104,12 @@ export async function pushChange(
     try {
         await apiClient.post("/api/vault/sync", { records: [payload] });
         return { success: true };
-    } catch (err: any) {
-        if (err.response?.status === 409) {
+    } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number, data?: unknown } };
+        if (axiosErr.response?.status === 409) {
             return {
                 success: false,
-                conflict: err.response.data,
+                conflict: axiosErr.response.data as SyncConflict,
             };
         }
         throw err;

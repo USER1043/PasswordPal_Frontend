@@ -131,8 +131,8 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
             setQrData(null);
             setVerifyCode("");
             success("Two-factor authentication enabled!");
-        } catch (err: any) {
-            const msg = err.response?.data?.error || "Verification failed. Please try again.";
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error || "Verification failed. Please try again.";
             notifyError(msg);
         } finally {
             setActionLoading(false);
@@ -151,8 +151,8 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
             setShowDisableConfirm(false);
             setDisableCode("");
             success("Two-factor authentication disabled");
-        } catch (err: any) {
-            const msg = err.response?.data?.error || "Failed to disable 2FA";
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error || "Failed to disable 2FA";
             notifyError(msg);
         } finally {
             setActionLoading(false);
@@ -165,8 +165,8 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
             const result = await totpService.generateBackupCodes();
             setBackupCodes(result.backupCodes || []);
             success("New backup codes generated");
-        } catch (err: any) {
-            const msg = err.response?.data?.error || "Failed to generate backup codes";
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error || "Failed to generate backup codes";
             notifyError(msg);
         } finally {
             setActionLoading(false);
@@ -194,7 +194,7 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
             setOldPassword("");
             setNewPassword("");
             setConfirmNewPassword("");
-        } catch (err: any) {
+        } catch {
             notifyError("Password change failed. Check your current password.");
         } finally {
             setChangePwdLoading(false);
@@ -452,8 +452,8 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             success("Vault exported successfully");
-        } catch (err: any) {
-            if (err.response?.status === 403) {
+        } catch (err: unknown) {
+            if ((err as { response?: { status?: number } }).response?.status === 403) {
                 setPendingAction("export");
                 setShowReauthModal(true);
             } else {
@@ -472,8 +472,8 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
             await apiClient.delete("/api/delete-account");
             await authService.logout();
             onNavigate("login");
-        } catch (err: any) {
-            if (err.response?.status === 403) {
+        } catch (err: unknown) {
+            if ((err as { response?: { status?: number } }).response?.status === 403) {
                 setPendingAction("delete");
                 setShowReauthModal(true);
             } else {

@@ -22,6 +22,7 @@ interface AuditLogPageProps {
 
 const PAGE_SIZE = 20;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPageProps) {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);

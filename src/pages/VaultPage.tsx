@@ -64,7 +64,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     try {
       const items = await vaultService.fetchVault();
       setPasswords(items.map(toPasswordData));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load vault:", err);
       notifyErrorRef.current("Failed to load vault data");
     } finally {
@@ -102,7 +102,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     try {
       const entry = toVaultEntry(data);
       if (editingPassword?.id) {
-        await vaultService.saveEntry(entry, editingPassword.id, (editingPassword as any).version);
+        await vaultService.saveEntry(entry, editingPassword.id, (editingPassword as unknown as { version?: number }).version);
       } else {
         await vaultService.saveEntry(entry);
       }
@@ -110,9 +110,9 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
       setShowAddModal(false);
       success(editingPassword ? "Password updated" : "Password saved");
       await loadVault();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Save failed:", err);
-      if (err.response?.status === 409) {
+      if ((err as { response?: { status?: number } }).response?.status === 409) {
         notifyError("Version conflict — someone else modified this entry. Please refresh.");
       } else {
         notifyError("Failed to save password");

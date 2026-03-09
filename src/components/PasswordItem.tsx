@@ -27,7 +27,8 @@ export default function PasswordItem({
     const [showMenu, setShowMenu] = useState(false);
     const [copied, setCopied] = useState(false);
 
-    const handleCopy = async (text: string, type: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const handleCopy = async (text: string, _type: string) => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);

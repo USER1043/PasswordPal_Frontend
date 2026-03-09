@@ -97,13 +97,13 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       success("Welcome back! Your vault is unlocked.");
       onLoginSuccess?.(email);
       onNavigate("vault");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login Error:", err);
-      if (err.response?.status === 404) {
+      if ((err as { response?: { status?: number } }).response?.status === 404) {
         notifyError("User not found");
-      } else if (err.response?.status === 401) {
+      } else if ((err as { response?: { status?: number } }).response?.status === 401) {
         notifyError("Invalid password");
-      } else if (err.response?.status === 429) {
+      } else if ((err as { response?: { status?: number } }).response?.status === 429) {
         notifyError("Too many login attempts. Please wait.");
       } else {
         notifyError("Login failed. Please try again.");
@@ -132,7 +132,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       success("Welcome back! Your vault is unlocked.");
       onLoginSuccess?.(email);
       onNavigate("vault");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("MFA Error:", err);
       notifyError(useBackupCode ? "Invalid backup code" : "Invalid authentication code");
     } finally {

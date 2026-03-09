@@ -1,10 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import ToastContainer from '../components/ToastContainer';
 import { NotificationProvider, useNotification } from '../context/NotificationContext';
 
 // Helper component to trigger toasts
-const TestTrigger = ({ message, type }: { message: string, type: 'success' | 'error' | 'warning' | 'info' }) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const TestTrigger = ({ message, type: _type }: { message: string, type: 'success' | 'error' | 'warning' | 'info' }) => {
     const { success, error, warning, info } = useNotification();
     return (
         <div>

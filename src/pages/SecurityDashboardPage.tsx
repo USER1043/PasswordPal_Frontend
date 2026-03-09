@@ -1,7 +1,7 @@
 // ============================================================================
 // SecurityDashboardPage — Real vault analysis (strength, reuse, age, breach)
 // ============================================================================
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     Shield, AlertTriangle, CheckCircle, XCircle,
     Loader2, RefreshCw, Lock, Eye,
@@ -51,25 +51,7 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
     const [breachProgress, setBreachProgress] = useState(0);
     const { error: notifyError } = useNotification();
 
-    useEffect(() => {
-        loadAndAnalyze();
-    }, []);
-
-    const loadAndAnalyze = async () => {
-        setLoading(true);
-        try {
-            const items = await vaultService.fetchVault();
-            const analyzed = analyzeVault(items);
-            setAnalyses(analyzed);
-        } catch (err) {
-            console.error("Failed to load vault for analysis:", err);
-            notifyError("Failed to load vault data for security analysis");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const analyzeVault = (items: DecryptedVaultItem[]): PasswordAnalysis[] => {
+    const analyzeVault = useCallback((items: DecryptedVaultItem[]): PasswordAnalysis[] => {
         // Count password occurrences for reuse detection
         const passwordCounts = new Map<string, number>();
         items.forEach((item) => {
@@ -98,7 +80,25 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
                 updatedAt: item.updated_at,
             };
         });
-    };
+    }, []);
+
+    const loadAndAnalyze = useCallback(async () => {
+        setLoading(true);
+        try {
+            const items = await vaultService.fetchVault();
+            const analyzed = analyzeVault(items);
+            setAnalyses(analyzed);
+        } catch (err) {
+            console.error("Failed to load vault for analysis:", err);
+            notifyError("Failed to load vault data for security analysis");
+        } finally {
+            setLoading(false);
+        }
+    }, [analyzeVault, notifyError]);
+
+    useEffect(() => {
+        loadAndAnalyze();
+    }, [loadAndAnalyze]);
 
     const runBreachCheck = async () => {
         setBreachChecking(true);
