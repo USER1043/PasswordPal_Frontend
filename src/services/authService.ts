@@ -26,6 +26,11 @@ export interface LoginResult {
     tempToken?: string;
 }
 
+interface ApiResponse<T = Record<string, unknown>> {
+    data: T;
+    status: number;
+}
+
 export const authService = {
     /**
      * Register a new user — keys generated in Rust (Zero Knowledge)
@@ -35,11 +40,20 @@ export const authService = {
             password: masterPassword,
         });
 
+        // Hash the recovery key (raw MEK base64) with SHA-256 so the backend
+        // can verify it later without ever seeing the raw key.
+        const recoveryKeyBytes = new TextEncoder().encode(verifyKeys.recovery_key);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", recoveryKeyBytes);
+        const recoveryKeyHash = Array.from(new Uint8Array(hashBuffer))
+            .map(b => b.toString(16).padStart(2, "0"))
+            .join("");
+
         await apiClient.post("/auth/register", {
             email,
             salt: verifyKeys.salt,
             wrapped_mek: verifyKeys.wrapped_mek,
             auth_hash: verifyKeys.auth_hash,
+            recovery_key_hash: recoveryKeyHash,
         });
 
         return verifyKeys.recovery_key;
@@ -49,7 +63,7 @@ export const authService = {
      * Step 1 of Login: Get authentication parameters (salt + wrapped MEK)
      */
     async getParams(email: string): Promise<AuthParams> {
-        const response = await apiClient.get("/auth/params", { params: { email } });
+        const response = await apiClient.get("/auth/params", { params: { email } }) as ApiResponse<AuthParams>;
         return response.data;
     },
 
@@ -72,7 +86,7 @@ export const authService = {
         const response = await apiClient.post("/auth/login", {
             email,
             auth_hash: loginData.auth_hash,
-        });
+        }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
 
         // Check if MFA is required
         if (response.data?.mfa_required) {
