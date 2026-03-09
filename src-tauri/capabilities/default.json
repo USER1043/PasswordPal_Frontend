@@ -12,6 +12,9 @@
       "allow": [
         {
           "url": "https://passwordpal-backend.onrender.com/*"
+        },
+        {
+          "url": "http://localhost:3000/*"
         }
       ]
     },

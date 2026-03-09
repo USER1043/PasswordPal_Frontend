@@ -31,17 +31,26 @@ interface FetchOptions {
   method?: string;
   headers?: Record<string, string>;
   body?: unknown;
+  params?: Record<string, string>;
   _retry?: boolean;
 }
 
 // Custom adapter to replace axios and use Tauri's native Rust HTTP client
 // By using Tauri's fetch we bypass the browser's CORS restrictions
 async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promise<unknown> {
-  const fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
+  let fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
 
-  const headers = new Headers(options.headers || {});
-  if (!headers.has("Content-Type") && typeof options.body === "string") {
-    headers.set("Content-Type", "application/json");
+  if (options.params) {
+    const searchParams = new URLSearchParams(options.params);
+    fullUrl += `?${searchParams.toString()}`;
+  }
+
+  const headers: Record<string, string> = { ...options.headers };
+  // Case-insensitive check for content-type
+  const hasContentType = Object.keys(headers).some(k => k.toLowerCase() === "content-type");
+
+  if (!hasContentType && options.body !== undefined && options.body !== null) {
+    headers["Content-Type"] = "application/json";
   }
 
   const fetchOptions: Record<string, unknown> = {
