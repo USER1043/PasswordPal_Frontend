@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, Save, RefreshCw, Eye, EyeOff, AlertTriangle, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Save, RefreshCw, Eye, EyeOff, AlertTriangle, Loader2, ChevronDown } from "lucide-react";
 import * as breachService from "../services/breachService";
 
 interface AddPasswordModalProps {
@@ -44,6 +44,31 @@ export default function AddPasswordModal({
     const [customFolders, setCustomFolders] = useState<string[]>([]);
     const [breachWarning, setBreachWarning] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+
+    // Sync incoming editData into local state when the modal opens.
+    // This is required because the modal stays mounted in VaultPage, 
+    // so useState(editData) only runs once on initial mount.
+    useEffect(() => {
+        if (isOpen) {
+            if (editData) {
+                setFormData(editData);
+                calculateStrength(editData.password || "");
+            } else {
+                setFormData({
+                    name: "",
+                    username: "",
+                    password: "",
+                    url: "",
+                    folder: "",
+                    notes: "",
+                });
+                setPasswordStrength(0);
+            }
+            setBreachWarning(null);
+            setShowNewFolderInput(false);
+            setNewFolderName("");
+        }
+    }, [isOpen, editData]);
 
     if (!isOpen) return null;
 
@@ -273,7 +298,7 @@ export default function AddPasswordModal({
                             Folder
                         </label>
                         {!showNewFolderInput ? (
-                            <div className="space-y-2">
+                            <div className="space-y-2 relative">
                                 <select
                                     value={formData.folder}
                                     onChange={(e) => {
@@ -283,7 +308,7 @@ export default function AddPasswordModal({
                                             setFormData({ ...formData, folder: e.target.value });
                                         }
                                     }}
-                                    className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                    className="w-full appearance-none bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                                 >
                                     <option value="" className="bg-slate-800 text-slate-300">No Folder</option>
                                     <option value="Personal" className="bg-slate-800 text-white">📁 Personal</option>
@@ -299,6 +324,9 @@ export default function AddPasswordModal({
                                         ➕ Create New Folder
                                     </option>
                                 </select>
+                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                    <ChevronDown className="w-5 h-5 text-slate-400" />
+                                </div>
                             </div>
                         ) : (
                             <div className="space-y-2">
