@@ -2,9 +2,23 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
-    "opener:default"
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://passwordpal-backend.onrender.com/*"
+        },
+        {
+          "url": "http://localhost:3000/*"
+        }
+      ]
+    },
+    "opener:default",
+    "http:default"
   ]
 }

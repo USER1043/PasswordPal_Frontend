@@ -2,7 +2,7 @@
 name = "passwordpal"
 version = "0.1.0"
 description = "A Tauri App"
-authors = ["you"]
+authors = ["prajan"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -31,4 +31,7 @@ zeroize = "1.8.2"
 argon2 = "0.5"
 hex = "0.4.3"
 blake3 = "1.8.3"
+tauri-plugin-http = "2"
 
+[profile.release]
+strip = false 

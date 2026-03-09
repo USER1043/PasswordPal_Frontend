@@ -1,16 +1,14 @@
 // ============================================================================
 // HTTP client for communicating with the backend API
-// Handles token refresh, session revocation, and sensitive data wiping
+// Handles token refresh, session revocation, and sensitive data wiping via Tauri Native Fetch
 // ============================================================================
-import axios from "axios";
+import { fetch } from "@tauri-apps/plugin-http";
 import { invoke } from "@tauri-apps/api/core";
 
 export const SESSION_REVOKED_EVENT = "session-revoked";
 
-const apiClient = axios.create({
-  baseURL: "http://localhost:3000",
-  withCredentials: true,
-});
+// We point to Vite's environment variable which we set to the Render backend url in production
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
 /** Wipe encryption keys from Rust memory */
 export const wipe_sensitive_data = async () => {
@@ -29,62 +27,134 @@ function onRefreshed(success: boolean) {
   refreshSubscribers = [];
 }
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+interface FetchOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  params?: Record<string, string>;
+  _retry?: boolean;
+}
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // Don't try to refresh the refresh call itself
-      if (originalRequest.url?.includes("/auth/refresh") ||
-        originalRequest.url?.includes("/auth/login") ||
-        originalRequest.url?.includes("/auth/register")) {
-        return Promise.reject(error);
-      }
+// Custom adapter to replace axios and use Tauri's native Rust HTTP client
+// By using Tauri's fetch we bypass the browser's CORS restrictions
+async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promise<unknown> {
+  let fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
 
-      originalRequest._retry = true;
+  if (options.params) {
+    const searchParams = new URLSearchParams(options.params);
+    fullUrl += `?${searchParams.toString()}`;
+  }
 
-      if (!isRefreshing) {
-        isRefreshing = true;
-        try {
-          await axios.post("http://localhost:3000/auth/refresh", null, {
-            withCredentials: true,
+  const headers: Record<string, string> = { ...options.headers };
+  // Case-insensitive check for content-type
+  const hasContentType = Object.keys(headers).some(k => k.toLowerCase() === "content-type");
+
+  if (!hasContentType && options.body !== undefined && options.body !== null) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const fetchOptions: Record<string, unknown> = {
+    method: options.method || "GET",
+    headers,
+  };
+
+  if (options.body) {
+    if (typeof options.body === "object") {
+      fetchOptions.body = JSON.stringify(options.body);
+    } else {
+      fetchOptions.body = options.body;
+    }
+  }
+
+  try {
+    const response = await fetch(fullUrl, fetchOptions);
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (response.status === 401 && !options._retry) {
+        if (
+          url.includes("/auth/refresh") ||
+          url.includes("/auth/login") ||
+          url.includes("/auth/register")
+        ) {
+          return Promise.reject({
+            response: { status: response.status, data },
+            config: options,
           });
-          isRefreshing = false;
-          onRefreshed(true);
-          // Retry original request
-          return apiClient(originalRequest);
-        } catch {
-          isRefreshing = false;
-          onRefreshed(false);
-
-          // Refresh failed — wipe and redirect
-          await wipe_sensitive_data();
-          const event = new CustomEvent(SESSION_REVOKED_EVENT, {
-            detail: {
-              message:
-                "Your session has expired. Please log in again.",
-            },
-          });
-          window.dispatchEvent(event);
-          return Promise.reject(error);
         }
-      } else {
-        // Another refresh is in progress — wait for it
-        return new Promise((resolve, reject) => {
-          refreshSubscribers.push((success: boolean) => {
-            if (success) {
-              resolve(apiClient(originalRequest));
-            } else {
-              reject(error);
-            }
+
+        options._retry = true;
+
+        if (!isRefreshing) {
+          isRefreshing = true;
+          try {
+            await fetch(`${BASE_URL}/auth/refresh`, { method: "POST" });
+            isRefreshing = false;
+            onRefreshed(true);
+            return tauriFetchAdapter(url, options); // Retry original request
+          } catch {
+            isRefreshing = false;
+            onRefreshed(false);
+
+            await wipe_sensitive_data();
+            const event = new CustomEvent(SESSION_REVOKED_EVENT, {
+              detail: {
+                message: "Your session has expired. Please log in again.",
+              },
+            });
+            window.dispatchEvent(event);
+            return Promise.reject({
+              response: { status: response.status, data },
+              config: options,
+            });
+          }
+        } else {
+          return new Promise((resolve, reject) => {
+            refreshSubscribers.push((success: boolean) => {
+              if (success) {
+                resolve(tauriFetchAdapter(url, options));
+              } else {
+                reject({
+                  response: { status: response.status, data },
+                  config: options,
+                });
+              }
+            });
           });
-        });
+        }
       }
+
+      return Promise.reject({
+        response: {
+          status: response.status,
+          data: data,
+        },
+        config: options,
+      });
     }
 
-    return Promise.reject(error);
+    return {
+      data,
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    };
+  } catch (err: unknown) {
+    console.error("Tauri Fetch Error:", err);
+    return Promise.reject(err);
   }
-);
+}
+
+// Create a mock apiClient object that provides .get, .post, .put, .delete like Axios
+const apiClient = {
+  get: (url: string, config?: FetchOptions) => tauriFetchAdapter(url, { ...config, method: "GET" }),
+  post: (url: string, data?: unknown, config?: FetchOptions) => tauriFetchAdapter(url, { ...config, method: "POST", body: data }),
+  put: (url: string, data?: unknown, config?: FetchOptions) => tauriFetchAdapter(url, { ...config, method: "PUT", body: data }),
+  delete: (url: string, config?: FetchOptions) => tauriFetchAdapter(url, { ...config, method: "DELETE" }),
+  interceptors: {
+    request: { use: () => { } },
+    response: { use: () => { } },
+  }
+};
 
 export default apiClient;

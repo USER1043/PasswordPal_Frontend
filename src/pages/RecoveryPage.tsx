@@ -2,7 +2,7 @@
 // RecoveryPage — Account Recovery via Recovery Key (Zero-Knowledge)
 // ============================================================================
 import { useState } from "react";
-import { Shield, Key, Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
+import { Shield, Key, Eye, EyeOff, Loader2, AlertTriangle, Copy, CheckCircle } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
@@ -18,7 +18,16 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [recoveredKey, setRecoveredKey] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
     const { success, error: notifyError } = useNotification();
+
+    const handleCopy = async () => {
+        if (!recoveredKey) return;
+        await navigator.clipboard.writeText(recoveredKey);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const handleRecover = async () => {
         if (!email || !recoveryKey || !newPassword) {
@@ -36,46 +45,85 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
 
         setLoading(true);
         try {
-            // 1. Get salt from backend
-            const paramsRes = await apiClient.get("/auth/params", { params: { email } });
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { salt: _salt } = paramsRes.data;
-
-            // 2. The recovery key IS the raw MEK (base64). We need to re-wrap it with the new password.
-            //    Use Rust to generate new auth credentials with the new password
-            const registerData = await invoke<{
-                salt: string;
-                wrapped_mek: string;
-                auth_hash: string;
-                recovery_key: string;
-            }>("register_vault", { password: newPassword });
-
-            // 3. Update the server with new credentials
-            //    Since we're recovering, we need a dedicated endpoint or re-register approach
-            //    For now, update via the backend
-            await apiClient.post("/auth/recover", {
-                email,
-                recovery_key: recoveryKey,
-                new_salt: registerData.salt,
-                new_wrapped_mek: registerData.wrapped_mek,
-                new_auth_hash: registerData.auth_hash,
+            // Re-wrap the existing MEK from the recovery key under the new password.
+            // This preserves the vault — no new MEK is generated.
+            const recoverData = await invoke<{
+                new_salt: string;
+                new_wrapped_mek: string;
+                new_auth_hash: string;
+            }>("recover_vault", {
+                recoveryKey: recoveryKey.trim(),
+                newPassword,
             });
 
-            success("Account recovered! Please log in with your new password.");
-            onNavigate("login");
+            // Send new credentials to backend. Backend verifies the recovery key hash
+            // server-side before updating.
+            await apiClient.post("/auth/recover", {
+                email,
+                recovery_key: recoveryKey.trim(),
+                new_salt: recoverData.new_salt,
+                new_wrapped_mek: recoverData.new_wrapped_mek,
+                new_auth_hash: recoverData.new_auth_hash,
+            });
+
+            success("Account recovered!");
+            setRecoveredKey(recoveryKey.trim());
         } catch (err: unknown) {
             console.error("Recovery error:", err);
-            if ((err as { response?: { status?: number } }).response?.status === 404) {
-                notifyError("Account not found");
-            } else if ((err as { response?: { status?: number } }).response?.status === 401) {
-                notifyError("Invalid recovery key");
+            const status = (err as { response?: { status?: number } }).response?.status;
+            if (status === 404) {
+                notifyError("Account not found or no recovery key on file");
+            } else if (status === 401) {
+                notifyError("Invalid recovery key — please check and try again");
             } else {
-                notifyError("Recovery failed. Please check your recovery key.");
+                const detail = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
+                notifyError(detail || "Recovery failed. Please check your recovery key.");
             }
         } finally {
             setLoading(false);
         }
     };
+
+    // ── Success screen ───────────────────────────────────────────────────────
+    if (recoveredKey) {
+        return (
+            <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
+                <div className="w-full max-w-md">
+                    <div className="bg-slate-900/40 backdrop-blur-2xl border border-emerald-500/20 rounded-3xl p-8 shadow-2xl shadow-emerald-500/10 text-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 mb-4">
+                            <CheckCircle className="w-8 h-8 text-emerald-400" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2">Account Recovered!</h2>
+                        <p className="text-slate-400 text-sm mb-6">
+                            Your master password has been reset. Your recovery key is <strong className="text-white">unchanged</strong> — make sure you still have it saved securely.
+                        </p>
+
+                        <div className="bg-slate-950/60 border border-yellow-500/30 rounded-xl p-4 mb-4 text-left">
+                            <p className="text-xs text-yellow-400 font-medium mb-2 flex items-center gap-1">
+                                <Key className="w-3.5 h-3.5" /> Your Recovery Key
+                            </p>
+                            <p className="font-mono text-xs text-white break-all leading-relaxed">{recoveredKey}</p>
+                        </div>
+
+                        <button
+                            onClick={handleCopy}
+                            className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-all mb-3"
+                        >
+                            <Copy className="w-4 h-4" />
+                            {copied ? "Copied!" : "Copy Recovery Key"}
+                        </button>
+
+                        <button
+                            onClick={() => onNavigate("login")}
+                            className="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-600 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-purple-500/20"
+                        >
+                            Continue to Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 relative overflow-hidden">
