@@ -31,13 +31,14 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
     const [totalFailed, setTotalFailed] = useState(0);
     const [page, setPage] = useState(0);
     const [error, setError] = useState("");
+    const isOffline = !!localStorage.getItem("offline_token");
 
     const fetchLogs = async (pageNum: number) => {
         setLoading(true);
         setError("");
         try {
             const response = await apiClient.get("/api/audit-logs", {
-                params: { limit: PAGE_SIZE, offset: pageNum * PAGE_SIZE },
+                params: { limit: PAGE_SIZE.toString(), offset: (pageNum * PAGE_SIZE).toString() },
             });
             setLogs(response.data.logs);
             setTotal(response.data.total);
@@ -92,6 +93,17 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
         return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     };
 
+    if (isOffline) {
+        return (
+            <div className="p-6 space-y-6 flex flex-col items-center justify-center text-center py-20">
+                <Shield className="w-16 h-16 text-slate-600 mb-4" />
+                <h3 className="text-xl font-semibold text-slate-400 mb-2">Audit Logs Unavailable Offline</h3>
+                <p className="text-slate-500 max-w-sm">
+                    Audit logs are strictly maintained on the secure server to trace recent login activities and geographical IPs. Connect to the internet to view them.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 space-y-6">

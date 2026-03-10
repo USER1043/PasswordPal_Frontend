@@ -54,6 +54,7 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
     const [breachChecking, setBreachChecking] = useState(false);
     const [breachProgress, setBreachProgress] = useState(0);
     const { error: notifyError, success: notifySuccess, warning: notifyWarning } = useNotification();
+    const isOffline = !!localStorage.getItem("offline_token");
 
     const analyzeVault = useCallback((items: DecryptedVaultRecord[]): PasswordAnalysis[] => {
         // Count password occurrences for reuse detection
@@ -188,6 +189,18 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
             <div className="flex items-center justify-center h-full py-20">
                 <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
                 <span className="ml-4 text-slate-400 text-lg">Analyzing vault security...</span>
+            </div>
+        );
+    }
+
+    if (isOffline) {
+        return (
+            <div className="p-8 max-w-5xl mx-auto flex flex-col items-center justify-center text-center py-20">
+                <Shield className="w-16 h-16 text-slate-600 mb-4" />
+                <h3 className="text-xl font-semibold text-slate-400 mb-2">Security Dashboard Unavailable Offline</h3>
+                <p className="text-slate-500 max-w-sm">
+                    The Security Dashboard requires an active internet connection to evaluate data breaches and synchronize history with the server.
+                </p>
             </div>
         );
     }

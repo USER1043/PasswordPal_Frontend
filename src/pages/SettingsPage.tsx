@@ -23,12 +23,25 @@ interface SettingsPageProps {
 export default function SettingsPage({ onNavigate, userEmail = "" }: SettingsPageProps) {
     const [activeTab, setActiveTab] = useState("security");
     const { success, error: notifyError } = useNotification();
+    const isOffline = !!localStorage.getItem("offline_token");
 
     const tabs = [
         { id: "security", label: "Security", icon: Shield },
         { id: "devices", label: "Devices", icon: Monitor },
         { id: "account", label: "Account", icon: User },
     ];
+
+    if (isOffline) {
+        return (
+            <div className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center text-center py-20">
+                <Settings className="w-16 h-16 text-slate-600 mb-4" />
+                <h3 className="text-xl font-semibold text-slate-400 mb-2">Settings Unavailable Offline</h3>
+                <p className="text-slate-500 max-w-md">
+                    Account settings, Two-Factor Authentication, and Device Management require server verification and cannot be modified while offline.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="p-8 max-w-4xl mx-auto">

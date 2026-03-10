@@ -1,10 +1,10 @@
-use rusqlite::{Connection, Result as SqlResult, params};
-use serde::{Deserialize, Serialize};
-use tauri::{State, command, AppHandle, Manager};
-use std::sync::Mutex;
-use std::fs;
 use crate::models::{VaultEntry, VaultRecord};
 use crate::state::VaultState;
+use rusqlite::{params, Connection, Result as SqlResult};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::sync::Mutex;
+use tauri::{command, AppHandle, Manager, State};
 
 pub struct DbState {
     pub conn: Mutex<Connection>,
@@ -22,12 +22,15 @@ pub struct SyncQueueItem {
 }
 
 pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
-    let app_data_dir = app_handle.path().app_data_dir().expect("Failed to get app data dir");
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .expect("Failed to get app data dir");
     fs::create_dir_all(&app_data_dir).expect("Failed to create app data dir");
     let db_path = app_data_dir.join("passwordpal.db");
-    
+
     let conn = Connection::open(db_path)?;
-    
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS local_vault (
             id TEXT PRIMARY KEY,
@@ -40,30 +43,49 @@ pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
         )",
         [],
     )?;
-    
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS auth_cache (
+            email TEXT PRIMARY KEY,
+            salt TEXT NOT NULL,
+            wrapped_mek TEXT NOT NULL,
+            local_password_hash TEXT NOT NULL
+        )",
+        [],
+    )?;
+
     Ok(conn)
 }
 
 fn split_blob(blob_b64: &str) -> Result<(String, String), String> {
     use base64::{engine::general_purpose, Engine as _};
-    let payload = general_purpose::STANDARD.decode(blob_b64).map_err(|_| "Invalid base64 payload")?;
-    if payload.len() < 12 { return Err("Payload too short".into()); }
+    let payload = general_purpose::STANDARD
+        .decode(blob_b64)
+        .map_err(|_| "Invalid base64 payload")?;
+    if payload.len() < 12 {
+        return Err("Payload too short".into());
+    }
     let (nonce_bytes, ciphertext_bytes) = payload.split_at(12);
     Ok((
         general_purpose::STANDARD.encode(nonce_bytes),
-        general_purpose::STANDARD.encode(ciphertext_bytes)
+        general_purpose::STANDARD.encode(ciphertext_bytes),
     ))
 }
 
 fn combine_blob(nonce_b64: &str, ciphertext_b64: &str) -> Result<String, String> {
     use base64::{engine::general_purpose, Engine as _};
-    let mut nonce = general_purpose::STANDARD.decode(nonce_b64).map_err(|_| "Invalid nonce base64")?;
-    let ciphertext = general_purpose::STANDARD.decode(ciphertext_b64).map_err(|_| "Invalid ciphertext base64")?;
+    let mut nonce = general_purpose::STANDARD
+        .decode(nonce_b64)
+        .map_err(|_| "Invalid nonce base64")?;
+    let ciphertext = general_purpose::STANDARD
+        .decode(ciphertext_b64)
+        .map_err(|_| "Invalid ciphertext base64")?;
     nonce.extend_from_slice(&ciphertext);
     Ok(general_purpose::STANDARD.encode(nonce))
 }
 
 #[command]
+#[allow(clippy::too_many_arguments)]
 pub fn save_entry_local(
     db_state: State<'_, DbState>,
     vault_state: State<'_, Mutex<VaultState>>,
@@ -124,45 +146,48 @@ pub fn save_server_record_local(
 
 #[command]
 pub fn fetch_vault_local(
-    db_state: State<'_, DbState>, 
+    db_state: State<'_, DbState>,
     vault_state: State<'_, Mutex<VaultState>>,
-    user_id: String
+    user_id: String,
 ) -> Result<Vec<VaultRecord>, String> {
     let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
 
     let conn = db_state.conn.lock().map_err(|_| "DbState corrupted")?;
-    let mut stmt = conn.prepare(
-        "SELECT id, encrypted_data, nonce, version, sync_status, record_type 
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, encrypted_data, nonce, version, sync_status, record_type 
          FROM local_vault 
-         WHERE user_id = ?1 AND sync_status != 'pending_delete'"
-    ).map_err(|e| e.to_string())?;
+         WHERE user_id = ?1 AND sync_status != 'pending_delete'",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params![user_id], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, i64>(3)?,
-            row.get::<_, String>(4)?,
-            row.get::<_, String>(5)?,
-        ))
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![user_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
 
     let mut decrypted_vault = Vec::new();
 
-    for row_result in rows {
-        if let Ok((id, encrypted_data, nonce, version, sync_status, record_type)) = row_result {
-            // 2. Decrypt entirely in Rust RAM. Send plaintext to frontend over IPC.
-            if let Ok(blob_b64) = combine_blob(&nonce, &encrypted_data) {
-                if let Ok(plaintext_entry) = crate::commands::entry::decrypt_entry_logic(&st, &blob_b64) {
-                    decrypted_vault.push(VaultRecord {
-                        id,
-                        entry: plaintext_entry,
-                        version,
-                        sync_status,
-                        record_type,
-                    });
-                }
+    for (id, encrypted_data, nonce, version, sync_status, record_type) in rows.flatten() {
+        // 2. Decrypt entirely in Rust RAM. Send plaintext to frontend over IPC.
+        if let Ok(blob_b64) = combine_blob(&nonce, &encrypted_data) {
+            if let Ok(plaintext_entry) = crate::commands::entry::decrypt_entry_logic(&st, &blob_b64)
+            {
+                decrypted_vault.push(VaultRecord {
+                    id,
+                    entry: plaintext_entry,
+                    version,
+                    sync_status,
+                    record_type,
+                });
             }
         }
     }
@@ -172,9 +197,9 @@ pub fn fetch_vault_local(
 
 #[command]
 pub fn mark_deleted_local(
-    state: State<'_, DbState>, 
-    id: String, 
-    hard_delete: bool
+    state: State<'_, DbState>,
+    id: String,
+    hard_delete: bool,
 ) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
     if hard_delete {
@@ -184,49 +209,104 @@ pub fn mark_deleted_local(
         conn.execute(
             "UPDATE local_vault SET sync_status = 'pending_delete' WHERE id = ?1",
             params![id],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 #[command]
 pub fn get_pending_sync_queue(
-    state: State<'_, DbState>, 
-    user_id: String
+    state: State<'_, DbState>,
+    user_id: String,
 ) -> Result<Vec<SyncQueueItem>, String> {
     let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
-    let mut stmt = conn.prepare(
-        "SELECT id, encrypted_data, nonce, version, sync_status, record_type 
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, encrypted_data, nonce, version, sync_status, record_type 
          FROM local_vault 
-         WHERE user_id = ?1 AND sync_status != 'synced'"
-    ).map_err(|e| e.to_string())?;
+         WHERE user_id = ?1 AND sync_status != 'synced'",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let queue = stmt.query_map(params![user_id], |row| {
-        Ok(SyncQueueItem {
-            id: row.get(0)?,
-            user_id: user_id.clone(),
-            encrypted_data: row.get(1)?,
-            nonce: row.get(2)?,
-            version: row.get(3)?,
-            sync_status: row.get(4)?,
-            record_type: row.get(5)?,
+    let queue = stmt
+        .query_map(params![user_id], |row| {
+            Ok(SyncQueueItem {
+                id: row.get(0)?,
+                user_id: user_id.clone(),
+                encrypted_data: row.get(1)?,
+                nonce: row.get(2)?,
+                version: row.get(3)?,
+                sync_status: row.get(4)?,
+                record_type: row.get(5)?,
+            })
         })
-    }).map_err(|e| e.to_string())?
-    .filter_map(Result::ok)
-    .collect();
+        .map_err(|e| e.to_string())?
+        .filter_map(Result::ok)
+        .collect();
 
     Ok(queue)
 }
 
 #[command]
-pub fn mark_synced_local(
-    state: State<'_, DbState>,
-    id: String
-) -> Result<(), String> {
+pub fn mark_synced_local(state: State<'_, DbState>, id: String) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
     conn.execute(
         "UPDATE local_vault SET sync_status = 'synced' WHERE id = ?1",
         params![id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CachedAuthParams {
+    pub salt: String,
+    pub wrapped_mek: String,
+    pub local_password_hash: String,
+}
+
+#[command]
+pub fn cache_auth_params(
+    state: State<'_, DbState>,
+    email: String,
+    salt: String,
+    wrapped_mek: String,
+    local_password_hash: String,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
+    conn.execute(
+        "INSERT INTO auth_cache (email, salt, wrapped_mek, local_password_hash)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(email) DO UPDATE SET
+         salt=excluded.salt,
+         wrapped_mek=excluded.wrapped_mek,
+         local_password_hash=excluded.local_password_hash",
+        params![email, salt, wrapped_mek, local_password_hash],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+pub fn get_cached_auth_params(
+    state: State<'_, DbState>,
+    email: String,
+) -> Result<Option<CachedAuthParams>, String> {
+    let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
+    let mut stmt = conn
+        .prepare("SELECT salt, wrapped_mek, local_password_hash FROM auth_cache WHERE email = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let mut rows = stmt.query(params![email]).map_err(|e| e.to_string())?;
+
+    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        Ok(Some(CachedAuthParams {
+            salt: row.get(0).map_err(|e| e.to_string())?,
+            wrapped_mek: row.get(1).map_err(|e| e.to_string())?,
+            local_password_hash: row.get(2).map_err(|e| e.to_string())?,
+        }))
+    } else {
+        Ok(None)
+    }
 }

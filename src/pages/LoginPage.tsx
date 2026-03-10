@@ -8,6 +8,7 @@ import { Shield, Eye, EyeOff, Loader2, Sparkles, KeyRound, User } from "lucide-r
 import { useNotification } from "../context/NotificationContext";
 import { authService } from "../services/authService";
 import * as totpService from "../services/totpService";
+import AppLogo from "../components/common/AppLogo";
 
 const STORED_EMAILS_KEY = "passwordpal_recent_emails";
 
@@ -158,11 +159,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         {/* Branding */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="relative">
-              <Shield className="w-12 h-12 text-purple-400" strokeWidth={1.5} />
-              <div className="absolute inset-0 bg-purple-500 blur-xl opacity-30"></div>
-            </div>
-            <h1 className="text-2xl font-bold text-white ml-3">PasswordPal</h1>
+            <AppLogo size="lg" />
           </div>
           <div className="flex items-center justify-center gap-2 text-purple-300/80 text-sm">
             <Sparkles className="w-4 h-4" />
