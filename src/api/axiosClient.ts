@@ -74,6 +74,7 @@ async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promi
   const fetchOptions: Record<string, unknown> = {
     method: options.method || "GET",
     headers,
+    credentials: "include", // Required for cross-origin cookies in Tauri WebView 
   };
 
   if (options.body) {
