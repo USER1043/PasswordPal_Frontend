@@ -3,6 +3,7 @@
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
+import { cacheAuthParams, getCachedAuthParams } from "./dbService";
 
 export interface RegisterResponse {
     salt: string;
@@ -24,6 +25,7 @@ export interface LoginResult {
     success: boolean;
     mfa_required?: boolean;
     tempToken?: string;
+    isOfflineMode?: boolean;
 }
 
 interface ApiResponse<T = Record<string, unknown>> {
@@ -56,6 +58,9 @@ export const authService = {
             recovery_key_hash: recoveryKeyHash,
         });
 
+        // Cache the params locally instantly so offline mode works immediately after registration
+        await cacheAuthParams(email, verifyKeys.salt, verifyKeys.wrapped_mek);
+
         return verifyKeys.recovery_key;
     },
 
@@ -63,16 +68,27 @@ export const authService = {
      * Step 1 of Login: Get authentication parameters (salt + wrapped MEK)
      */
     async getParams(email: string): Promise<AuthParams> {
-        const response = await apiClient.get("/auth/params", { params: { email } }) as ApiResponse<AuthParams>;
-        return response.data;
+        try {
+            const response = await apiClient.get("/auth/params", { params: { email } }) as ApiResponse<AuthParams>;
+            return response.data;
+        } catch (err: any) {
+            // If the network is down or API fails, try the SQLite offline cache
+            if (err.message === "Network Error" || !err.response) {
+                const cached = await getCachedAuthParams(email);
+                if (cached) {
+                    return { salt: cached.salt, wrapped_mek: cached.wrapped_mek };
+                }
+            }
+            throw err;
+        }
     },
 
     /**
      * Step 2 of Login: Derive keys in Rust, authenticate with backend.
-     * Returns login result indicating if MFA is required.
+     * Returns login result indicating if MFA is required or if it's Offline Mode.
      */
     async login(email: string, masterPassword: string): Promise<LoginResult> {
-        // 1. Fetch Salt & Wrapped MEK
+        // 1. Fetch Salt & Wrapped MEK (online or offline fallback)
         const { salt, wrapped_mek } = await this.getParams(email);
 
         // 2. Derive Key & Unlock Vault in Rust
@@ -91,26 +107,38 @@ export const authService = {
             await apiClient.post("/auth/login", {
                 email,
                 auth_hash: "LOCAL_DECRYPTION_FAILED",
-            }).catch(() => {}); // Suppress the 401 response
+            }).catch(() => {}); // Suppress the 401/Network response
             throw err; // Re-throw the Rust error for the UI to catch
         }
 
         // 3. Send Auth Hash to Backend
-        const response = await apiClient.post("/auth/login", {
-            email,
-            auth_hash: loginData.auth_hash,
-        }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
+        try {
+            const response = await apiClient.post("/auth/login", {
+                email,
+                auth_hash: loginData.auth_hash,
+            }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
 
-        // Check if MFA is required
-        if (response.data?.mfa_required) {
-            return {
-                success: false,
-                mfa_required: true,
-                tempToken: response.data.tempToken,
-            };
+            // If online login succeeds, cache the latest params for future offline use
+            await cacheAuthParams(email, salt, wrapped_mek);
+            localStorage.setItem("active_user", email);
+
+            // Check if MFA is required
+            if (response.data?.mfa_required) {
+                return {
+                    success: false,
+                    mfa_required: true,
+                    tempToken: response.data.tempToken,
+                };
+            }
+
+            return { success: true, isOfflineMode: false };
+        } catch (err: any) {
+             // If local decryption succeeded, but the network is completely down, log in Offline Mode
+             if (err.message === "Network Error" || !err.response) {
+                 return { success: true, isOfflineMode: true };
+             }
+             throw err;
         }
-
-        return { success: true };
     },
 
     /**

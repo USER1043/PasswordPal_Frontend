@@ -3,6 +3,14 @@
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
+import { 
+    getLocalVault, 
+    clearLocalVaultCache, 
+    upsertLocalVaultItem, 
+    deleteLocalVaultItem, 
+    markItemSynced,
+    getPendingSyncItems
+} from "./dbService";
 
 export interface VaultEntry {
     name: string;
@@ -33,6 +41,58 @@ export interface DecryptedVaultItem extends VaultEntry {
     client_record_id: string | null;
     created_at: string;
     updated_at: string;
+    // Track if this item hasn't been synced to the server yet
+    isPendingSync?: boolean; 
+}
+
+function getActiveUserEmail(): string {
+    return localStorage.getItem("active_user") || "unknown";
+}
+
+/**
+ * Pushes any pending local SQLite modifications (inserts, updates, deletes)
+ * to the backend server. Should be called when the internet connection is restored.
+ */
+export async function syncOfflineVault(): Promise<void> {
+    const userId = getActiveUserEmail();
+    const pendingItems = await getPendingSyncItems(userId);
+
+    if (pendingItems.length === 0) return;
+    
+    console.log(`Syncing ${pendingItems.length} offline changes...`);
+
+    for (const item of pendingItems) {
+        try {
+            if (item.sync_status === 'pending_delete') {
+                await apiClient.delete(`/api/vault/${item.id}`);
+                await deleteLocalVaultItem(item.id, true);
+            } else {
+                // pending_insert or pending_update
+                const payload = {
+                    id: item.id,
+                    encrypted_data: item.encrypted_data,
+                    nonce: item.nonce,
+                    version: item.version,
+                    record_type: item.name, // Stored type in 'name' column
+                };
+                await apiClient.post("/api/vault", payload);
+                await markItemSynced(item.id);
+            }
+        } catch (err: any) {
+            // If offline, stop syncing and try again later
+            if (err.message === "Network Error" || !err.response) {
+                console.warn("Network lost during sync. Aborting.");
+                break;
+            } else if (err.response?.status === 409) {
+                // Version conflict — in a full implementation, we might try to merge.
+                // For now, we abandon the local edit and just use the server version.
+                console.warn(`Version conflict syncing item ${item.id}. Reverting local change.`);
+                await markItemSynced(item.id); // Forcing synced will let fetchVault overwrite it
+            } else {
+                console.error(`Failed to sync item ${item.id}:`, err);
+            }
+        }
+    }
 }
 
 /**
@@ -64,10 +124,52 @@ function splitEncryptedBlob(blobB64: string): { nonce: string; encrypted_data: s
 
 /**
  * Fetch all vault records from backend and decrypt each via Rust.
+ * Falls back to local SQLite cache if offline.
  */
 export async function fetchVault(): Promise<DecryptedVaultItem[]> {
-    const response = await apiClient.get("/api/vault");
-    const records: VaultRecord[] = response.data.items || response.data.data || response.data;
+    const userId = getActiveUserEmail();
+    let records: VaultRecord[] = [];
+
+    try {
+        await syncOfflineVault();
+        const response = await apiClient.get("/api/vault");
+        records = response.data.items || response.data.data || response.data;
+
+        // Save fresh records to SQLite cache for future offline access
+        await clearLocalVaultCache(userId);
+        for (const record of records) {
+            if (record.is_deleted) continue;
+            await upsertLocalVaultItem({
+                id: record.id,
+                user_id: userId,
+                name: record.record_type, // Storing type as temporary name for cache
+                encrypted_data: record.encrypted_data,
+                nonce: record.nonce,
+                version: record.version,
+                sync_status: 'synced',
+                updated_at: record.updated_at || new Date().toISOString()
+            });
+        }
+    } catch (err: any) {
+        if (err.message === "Network Error" || !err.response) {
+            console.warn("Offline mode: Reading vault from local SQLite cache.");
+            const cachedItems = await getLocalVault(userId);
+            records = cachedItems.map(item => ({
+                id: item.id,
+                encrypted_data: item.encrypted_data,
+                nonce: item.nonce,
+                version: item.version,
+                is_deleted: false,
+                record_type: item.name, // Revert name mapping hack
+                client_record_id: null,
+                created_at: item.updated_at,
+                updated_at: item.updated_at,
+                isPendingSync: item.sync_status !== 'synced'
+            }) as VaultRecord & { isPendingSync?: boolean });
+        } else {
+            throw err;
+        }
+    }
 
     const decrypted: DecryptedVaultItem[] = [];
 
@@ -86,6 +188,7 @@ export async function fetchVault(): Promise<DecryptedVaultItem[]> {
                 client_record_id: record.client_record_id,
                 created_at: record.created_at,
                 updated_at: record.updated_at,
+                isPendingSync: (record as any).isPendingSync 
             });
         } catch (err) {
             console.error(`Failed to decrypt record ${record.id}:`, err);
@@ -96,8 +199,8 @@ export async function fetchVault(): Promise<DecryptedVaultItem[]> {
 }
 
 /**
- * Encrypt an entry via Rust and save to backend.
- * If existingId + version provided, updates the existing record.
+ * Encrypt an entry via Rust and save to SQLite + backend.
+ * Uses a local-first approach.
  */
 export async function saveEntry(
     data: VaultEntry,
@@ -106,31 +209,69 @@ export async function saveEntry(
     recordType: string = "credential",
     clientRecordId?: string
 ): Promise<void> {
+    const userId = getActiveUserEmail();
+    const id = existingId || crypto.randomUUID(); // Generate offline ID if new
+    const activeVersion = version || 1;
+
     // Encrypt via Rust — returns Base64(nonce | ciphertext)
     const blobB64 = await invoke<string>("encrypt_entry", { entry: data });
     const { nonce, encrypted_data } = splitEncryptedBlob(blobB64);
 
-    const payload: Record<string, unknown> = {
+    // 1. Commit to Local SQLite Cache Immediately (Pending Sync)
+    await upsertLocalVaultItem({
+        id,
+        user_id: userId,
+        name: recordType,
         encrypted_data,
         nonce,
+        version: activeVersion,
+        sync_status: existingId ? 'pending_update' : 'pending_insert',
+        updated_at: new Date().toISOString()
+    });
+
+    // 2. Try to sync to backend
+    const payload: Record<string, unknown> = {
+        id, // Send our generated ID to the server
+        encrypted_data,
+        nonce,
+        version: activeVersion,
         record_type: recordType,
+        client_record_id: clientRecordId,
     };
 
-    if (existingId) {
-        payload.id = existingId;
-        payload.version = version || 1;
+    try {
+        await apiClient.post("/api/vault", payload);
+        // 3. Mark as Synced on Success
+        await markItemSynced(id);
+    } catch (err: any) {
+        // If it was a network error, do not throw. The app keeps working offline.
+        if (err.message === "Network Error" || !err.response) {
+            console.warn(`Saved entry ${id} offline. Will sync when reconnected.`);
+        } else {
+            // Re-throw genuine backend errors (like 409 Version Conflict)
+            throw err;
+        }
     }
-
-    if (clientRecordId) {
-        payload.client_record_id = clientRecordId;
-    }
-
-    await apiClient.post("/api/vault", payload);
 }
 
 /**
  * Soft-delete a vault record.
+ * Local-First approach.
  */
 export async function deleteEntry(id: string): Promise<void> {
-    await apiClient.delete(`/api/vault/${id}`);
+    // 1. Mark as pending_delete locally first
+    await deleteLocalVaultItem(id, false);
+
+    try {
+        // 2. Try to sync to backend
+        await apiClient.delete(`/api/vault/${id}`);
+        // 3. Hard delete locally on success
+        await deleteLocalVaultItem(id, true);
+    } catch (err: any) {
+        if (err.message === "Network Error" || !err.response) {
+             console.warn(`Deleted entry ${id} offline. Will sync when reconnected.`);
+        } else {
+             throw err;
+        }
+    }
 }
