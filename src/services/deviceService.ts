@@ -42,7 +42,7 @@ export async function getDevices(): Promise<Device[]> {
  * Revoke a device session
  */
 export async function revokeDevice(deviceId: string): Promise<void> {
-    await apiClient.post(`/api/devices/${deviceId}/revoke`);
+    await apiClient.post(`/api/devices/${deviceId}/revoke`, {});
 }
 
 /**

@@ -99,14 +99,20 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       onNavigate("vault");
     } catch (err: unknown) {
       console.error("Login Error:", err);
-      if ((err as { response?: { status?: number } }).response?.status === 404) {
-        notifyError("User not found");
-      } else if ((err as { response?: { status?: number } }).response?.status === 401) {
-        notifyError("Invalid password");
-      } else if ((err as { response?: { status?: number } }).response?.status === 429) {
+      // Handle Rust Tauri errors (thrown as strings when local decryption fails)
+      if (typeof err === "string" && err.includes("Invalid password")) {
+        notifyError("Email or password incorrect");
+        return;
+      }
+
+      // Handle Backend HTTP errors
+      const status = (err as { response?: { status?: number } }).response?.status;
+      if (status === 404 || status === 401) {
+        notifyError("Email or password incorrect");
+      } else if (status === 429) {
         notifyError("Too many login attempts. Please wait.");
       } else {
-        notifyError("Login failed. Please try again.");
+        notifyError("Internal server error. Please try again later.");
       }
     } finally {
       setLoading(false);

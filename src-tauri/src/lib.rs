@@ -21,7 +21,8 @@ pub fn run() {
             commands::auth::change_password_optimization,
             commands::auth::register_vault,
             commands::auth::login_vault,
-            commands::auth::recover_vault
+            commands::auth::recover_vault,
+            commands::os::get_os_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

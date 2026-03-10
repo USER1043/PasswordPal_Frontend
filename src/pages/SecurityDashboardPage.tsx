@@ -49,7 +49,7 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
     const [analyses, setAnalyses] = useState<PasswordAnalysis[]>([]);
     const [breachChecking, setBreachChecking] = useState(false);
     const [breachProgress, setBreachProgress] = useState(0);
-    const { error: notifyError } = useNotification();
+    const { error: notifyError, success: notifySuccess, warning: notifyWarning } = useNotification();
 
     const analyzeVault = useCallback((items: DecryptedVaultItem[]): PasswordAnalysis[] => {
         // Count password occurrences for reuse detection
@@ -104,8 +104,23 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
         setBreachChecking(true);
         setBreachProgress(0);
 
-        const items = await vaultService.fetchVault();
+        let items: Awaited<ReturnType<typeof vaultService.fetchVault>>;
+        try {
+            items = await vaultService.fetchVault();
+        } catch {
+            notifyError("Failed to load vault for breach check.");
+            setBreachChecking(false);
+            return;
+        }
+
+        if (items.length === 0) {
+            notifyWarning("No passwords in vault to check.");
+            setBreachChecking(false);
+            return;
+        }
+
         const updated = [...analyses];
+        let failCount = 0;
 
         for (let i = 0; i < items.length; i++) {
             try {
@@ -115,7 +130,7 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
                     updated[idx] = { ...updated[idx], breached: result.breached, breachCount: result.count };
                 }
             } catch {
-                // Skip individual failures
+                failCount++;
             }
             setBreachProgress(Math.round(((i + 1) / items.length) * 100));
             // Small delay to avoid rate limiting
@@ -124,6 +139,15 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
 
         setAnalyses(updated);
         setBreachChecking(false);
+
+        const newlyBreached = updated.filter((a) => a.breached).length;
+        if (failCount > 0) {
+            notifyWarning(`Breach check completed — ${failCount} password(s) could not be checked (network error).`);
+        } else if (newlyBreached > 0) {
+            notifyError(`Breach check complete — ${newlyBreached} password(s) found in known data breaches!`);
+        } else {
+            notifySuccess("Breach check complete — none of your passwords were found in known data breaches.");
+        }
     };
 
     // Calculate stats
