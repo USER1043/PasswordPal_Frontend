@@ -44,6 +44,16 @@ pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
         [],
     )?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS auth_cache (
+            email TEXT PRIMARY KEY,
+            salt TEXT NOT NULL,
+            wrapped_mek TEXT NOT NULL,
+            local_password_hash TEXT NOT NULL
+        )",
+        [],
+    )?;
+
     Ok(conn)
 }
 
@@ -169,8 +179,7 @@ pub fn fetch_vault_local(
     for (id, encrypted_data, nonce, version, sync_status, record_type) in rows.flatten() {
         // 2. Decrypt entirely in Rust RAM. Send plaintext to frontend over IPC.
         if let Ok(blob_b64) = combine_blob(&nonce, &encrypted_data) {
-            if let Ok(plaintext_entry) =
-                crate::commands::entry::decrypt_entry_logic(&st, &blob_b64)
+            if let Ok(plaintext_entry) = crate::commands::entry::decrypt_entry_logic(&st, &blob_b64)
             {
                 decrypted_vault.push(VaultRecord {
                     id,
@@ -248,4 +257,56 @@ pub fn mark_synced_local(state: State<'_, DbState>, id: String) -> Result<(), St
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CachedAuthParams {
+    pub salt: String,
+    pub wrapped_mek: String,
+    pub local_password_hash: String,
+}
+
+#[command]
+pub fn cache_auth_params(
+    state: State<'_, DbState>,
+    email: String,
+    salt: String,
+    wrapped_mek: String,
+    local_password_hash: String,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
+    conn.execute(
+        "INSERT INTO auth_cache (email, salt, wrapped_mek, local_password_hash)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(email) DO UPDATE SET
+         salt=excluded.salt,
+         wrapped_mek=excluded.wrapped_mek,
+         local_password_hash=excluded.local_password_hash",
+        params![email, salt, wrapped_mek, local_password_hash],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+pub fn get_cached_auth_params(
+    state: State<'_, DbState>,
+    email: String,
+) -> Result<Option<CachedAuthParams>, String> {
+    let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
+    let mut stmt = conn
+        .prepare("SELECT salt, wrapped_mek, local_password_hash FROM auth_cache WHERE email = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let mut rows = stmt.query(params![email]).map_err(|e| e.to_string())?;
+
+    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        Ok(Some(CachedAuthParams {
+            salt: row.get(0).map_err(|e| e.to_string())?,
+            wrapped_mek: row.get(1).map_err(|e| e.to_string())?,
+            local_password_hash: row.get(2).map_err(|e| e.to_string())?,
+        }))
+    } else {
+        Ok(None)
+    }
 }
