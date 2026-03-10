@@ -33,48 +33,64 @@ function getActiveUserEmail(): string {
     return localStorage.getItem("active_user") || "unknown";
 }
 
+let isSyncing = false;
+let syncRequested = false;
+
 /**
  * Pushes any pending SQLite modifications to the backend server.
  * Offline sync queue is driven by encrypted blobs safely extracted via Rust specifically for transmission.
  */
 export async function syncOfflineVault(): Promise<void> {
-    const userId = getActiveUserEmail();
-    const pendingItems: SyncQueueItem[] = await invoke("get_pending_sync_queue", { userId });
-
-    if (pendingItems.length === 0) return;
+    if (isSyncing) {
+        syncRequested = true;
+        return;
+    }
     
-    console.log(`Syncing ${pendingItems.length} offline changes...`);
+    isSyncing = true;
+    const userId = getActiveUserEmail();
 
-    for (const item of pendingItems) {
-        try {
-            if (item.sync_status === 'pending_delete') {
-                await apiClient.delete(`/api/vault/${item.id}`);
-                await invoke("mark_deleted_local", { id: item.id, hardDelete: true });
-            } else {
-                const payload = {
-                    id: item.id,
-                    encrypted_data: item.encrypted_data,
-                    nonce: item.nonce,
-                    version: item.version,
-                    record_type: item.record_type,
-                };
-                
-                console.log("Sync Payload:", JSON.stringify(payload, null, 2));
-                
-                await apiClient.post("/api/vault", payload);
-                await invoke("mark_synced_local", { id: item.id });
+    try {
+        do {
+            syncRequested = false;
+            const pendingItems: SyncQueueItem[] = await invoke("get_pending_sync_queue", { userId });
+
+            if (pendingItems.length === 0) break;
+            
+            console.log(`Syncing ${pendingItems.length} offline changes...`);
+
+            for (const item of pendingItems) {
+                try {
+                    if (item.sync_status === 'pending_delete') {
+                        await apiClient.delete(`/api/vault/${item.id}`);
+                        await invoke("mark_deleted_local", { id: item.id, hardDelete: true });
+                    } else {
+                        const payload = {
+                            id: item.id,
+                            encrypted_data: item.encrypted_data,
+                            nonce: item.nonce,
+                            version: item.version,
+                            record_type: item.record_type,
+                        };
+                        
+                        await apiClient.post("/api/vault", payload);
+                        await invoke("mark_synced_local", { id: item.id });
+                    }
+                } catch (err: any) {
+                    if (err.message === "Network Error" || !err.response) {
+                        console.warn("Network lost during sync. Aborting.");
+                        syncRequested = false; // break outer loop if offline
+                        break;
+                    } else if (err.response?.status === 409) {
+                        console.warn(`Version conflict syncing item ${item.id}. Reverting local change.`);
+                        await invoke("mark_synced_local", { id: item.id });
+                    } else {
+                        console.error(`Failed to sync item ${item.id}:`, err);
+                    }
+                }
             }
-        } catch (err: any) {
-            if (err.message === "Network Error" || !err.response) {
-                console.warn("Network lost during sync. Aborting.");
-                break;
-            } else if (err.response?.status === 409) {
-                console.warn(`Version conflict syncing item ${item.id}. Reverting local change.`);
-                await invoke("mark_synced_local", { id: item.id });
-            } else {
-                console.error(`Failed to sync item ${item.id}:`, err);
-            }
-        }
+        } while (syncRequested);
+    } finally {
+        isSyncing = false;
     }
 }
 
