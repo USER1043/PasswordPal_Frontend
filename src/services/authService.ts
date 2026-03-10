@@ -4,18 +4,17 @@
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
 
-async function cacheAuthParams(email: string, salt: string, wrapped_mek: string) {
-    localStorage.setItem(`auth_salt_${email}`, salt);
-    localStorage.setItem(`auth_mek_${email}`, wrapped_mek);
-}
-
-async function getCachedAuthParams(email: string): Promise<{ salt: string; wrapped_mek: string } | null> {
-    const salt = localStorage.getItem(`auth_salt_${email}`);
-    const wrapped_mek = localStorage.getItem(`auth_mek_${email}`);
-    if (salt && wrapped_mek) {
-        return { salt, wrapped_mek };
+async function cacheAuthParams(email: string, salt: string, wrapped_mek: string, auth_hash: string = "") {
+    try {
+        await invoke("cache_auth_params", {
+            email,
+            salt,
+            wrappedMek: wrapped_mek,
+            localPasswordHash: auth_hash
+        });
+    } catch (e) {
+        console.error("Failed to cache auth params natively:", e);
     }
-    return null;
 }
 
 export interface RegisterResponse {
@@ -72,7 +71,7 @@ export const authService = {
         });
 
         // Cache the params locally instantly so offline mode works immediately after registration
-        await cacheAuthParams(email, verifyKeys.salt, verifyKeys.wrapped_mek);
+        await cacheAuthParams(email, verifyKeys.salt, verifyKeys.wrapped_mek, verifyKeys.auth_hash);
 
         return verifyKeys.recovery_key;
     },
@@ -88,9 +87,18 @@ export const authService = {
         } catch (err: any) {
             // If the network is down or API fails, try the SQLite offline cache
             if (err.message === "Network Error" || !err.response) {
-                const cached = await getCachedAuthParams(email);
-                if (cached) {
-                    return { salt: cached.salt, wrapped_mek: cached.wrapped_mek };
+                console.warn("Offline mode: Fetching auth params from native SQLite cache");
+                try {
+                    const cached = await invoke<{ salt: string; wrapped_mek: string; local_password_hash: string }>("get_cached_auth_params", { email });
+                    if (cached) {
+                        return { 
+                            salt: cached.salt, 
+                            wrapped_mek: cached.wrapped_mek,
+                            local_password_hash: cached.local_password_hash
+                        } as AuthParams & { local_password_hash: string };
+                    }
+                } catch (dbErr) {
+                    console.error("No offline auth params found:", dbErr);
                 }
             }
             throw err;
@@ -103,7 +111,9 @@ export const authService = {
      */
     async login(email: string, masterPassword: string): Promise<LoginResult> {
         // 1. Fetch Salt & Wrapped MEK (online or offline fallback)
-        const { salt, wrapped_mek } = await this.getParams(email);
+        const params = await this.getParams(email);
+        const { salt, wrapped_mek } = params;
+        const localPasswordHash = (params as unknown as Record<string, unknown>).local_password_hash as string | undefined;
 
         // 2. Derive Key & Unlock Vault in Rust
         let loginData: LoginResponse;
@@ -142,21 +152,26 @@ export const authService = {
             }
 
             // If online login succeeds and no MFA needed, cache the latest params for future offline use
-            try {
-                await cacheAuthParams(email, salt, wrapped_mek);
-                localStorage.setItem("active_user", email);
-            } catch (dbErr) {
-                console.error("Failed to cache auth params in SQLite:", dbErr);
-                // Safe to proceed, just won't be available offline next time
-            }
+            await cacheAuthParams(email, salt, wrapped_mek, loginData.auth_hash);
+            localStorage.setItem("active_user", email);
+            localStorage.removeItem("offline_token");
 
             return { success: true, isOfflineMode: false };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
              // If local decryption succeeded, but the network is completely down, log in Offline Mode
-             if (err.message === "Network Error" || err.message === "Failed to fetch") {
-                 localStorage.setItem("active_user", email);
-                 return { success: true, isOfflineMode: true };
+             if (err.message === "Network Error" || err.message === "Failed to fetch" || !err.response) {
+                 // Offline Key Derivation Verification
+                 if (localPasswordHash && localPasswordHash === loginData.auth_hash) {
+                     localStorage.setItem("active_user", email);
+                     
+                     // Token Mocking: Set a mock offline token in Auth Context (localStorage)
+                     localStorage.setItem("offline_token", "mock-offline-token-" + Date.now());
+                     
+                     return { success: true, isOfflineMode: true };
+                 } else {
+                     throw new Error("Invalid offline master password signature.");
+                 }
              }
              throw err;
         }
@@ -166,6 +181,7 @@ export const authService = {
      * Logout — clear backend session + lock Rust vault
      */
     async logout(): Promise<void> {
+        localStorage.removeItem("offline_token");
         try {
             await apiClient.post("/auth/logout");
         } catch (err) {
