@@ -76,11 +76,24 @@ export const authService = {
         const { salt, wrapped_mek } = await this.getParams(email);
 
         // 2. Derive Key & Unlock Vault in Rust
-        const loginData = await invoke<LoginResponse>("login_vault", {
-            password: masterPassword,
-            salt,
-            wrappedMek: wrapped_mek,
-        });
+        let loginData: LoginResponse;
+        try {
+            loginData = await invoke<LoginResponse>("login_vault", {
+                password: masterPassword,
+                salt,
+                wrappedMek: wrapped_mek,
+            });
+        } catch (err) {
+            // ZERO-KNOWLEDGE AUDIT FIX:
+            // If local decryption fails (wrong password), the backend is never natively reached.
+            // We must intentionally hit /auth/login with a bogus hash so the backend
+            // records the failed attempt in the Audit Log and triggers rate-limiting.
+            await apiClient.post("/auth/login", {
+                email,
+                auth_hash: "LOCAL_DECRYPTION_FAILED",
+            }).catch(() => {}); // Suppress the 401 response
+            throw err; // Re-throw the Rust error for the UI to catch
+        }
 
         // 3. Send Auth Hash to Backend
         const response = await apiClient.post("/auth/login", {

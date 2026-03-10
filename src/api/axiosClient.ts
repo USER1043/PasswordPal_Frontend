@@ -10,6 +10,18 @@ export const SESSION_REVOKED_EVENT = "session-revoked";
 // We point to Vite's environment variable which we set to the Render backend url in production
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
+let cachedUserAgent: string | null = null;
+
+async function getUserAgent(): Promise<string> {
+  if (cachedUserAgent) return cachedUserAgent;
+  try {
+    cachedUserAgent = await invoke<string>("get_os_info");
+  } catch (e) {
+    cachedUserAgent = navigator.userAgent;
+  }
+  return cachedUserAgent;
+}
+
 /** Wipe encryption keys from Rust memory */
 export const wipe_sensitive_data = async () => {
   try {
@@ -37,7 +49,7 @@ interface FetchOptions {
 
 // Custom adapter to replace axios and use Tauri's native Rust HTTP client
 // By using Tauri's fetch we bypass the browser's CORS restrictions
-async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promise<unknown> {
+async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promise<any> {
   let fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
 
   if (options.params) {
@@ -51,6 +63,12 @@ async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promi
 
   if (!hasContentType && options.body !== undefined && options.body !== null) {
     headers["Content-Type"] = "application/json";
+  }
+
+  // Tauri's native HTTP client does not automatically attach a User-Agent.
+  // We fetch the OS username natively via Rust to display cleaner User-Agents in Audit Logs.
+  if (!Object.keys(headers).some(k => k.toLowerCase() === "user-agent")) {
+    headers["User-Agent"] = await getUserAgent();
   }
 
   const fetchOptions: Record<string, unknown> = {
@@ -68,7 +86,13 @@ async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promi
 
   try {
     const response = await fetch(fullUrl, fetchOptions);
-    const data = await response.json().catch(() => ({}));
+    const contentType = response.headers.get("content-type") ?? "";
+    let data: unknown;
+    if (contentType.includes("application/json")) {
+      data = await response.json().catch(() => ({}));
+    } else {
+      data = await response.text().catch(() => "");
+    }
 
     if (!response.ok) {
       if (response.status === 401 && !options._retry) {
