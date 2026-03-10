@@ -84,6 +84,7 @@ export const authService = {
         try {
             const response = await apiClient.get("/auth/params", { params: { email } }) as ApiResponse<AuthParams>;
             return response.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             // If the network is down or API fails, try the SQLite offline cache
             if (err.message === "Network Error" || !err.response) {
@@ -150,6 +151,7 @@ export const authService = {
             }
 
             return { success: true, isOfflineMode: false };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
              // If local decryption succeeded, but the network is completely down, log in Offline Mode
              if (err.message === "Network Error" || err.message === "Failed to fetch") {

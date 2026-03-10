@@ -75,6 +75,7 @@ export async function syncOfflineVault(): Promise<void> {
                         await apiClient.post("/api/vault", payload);
                         await invoke("mark_synced_local", { id: item.id });
                     }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } catch (err: any) {
                     if (err.message === "Network Error" || !err.response) {
                         console.warn("Network lost during sync. Aborting.");
@@ -123,6 +124,7 @@ export async function fetchVault(): Promise<DecryptedVaultRecord[]> {
                 recordType: record.record_type || 'credential'
             });
         }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
          if (err.message === "Network Error" || !err.response) {
             console.warn("Offline mode: Fetching natively from Rust local_vault.");
@@ -162,6 +164,7 @@ export async function saveEntry(
 
         // 2. Trigger async sync process
         syncOfflineVault().catch((e) => console.error("Sync failed:", e));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
         console.error("Local database error:", err);
         // Alert the user instead of unhandled promise rejection crashing React
