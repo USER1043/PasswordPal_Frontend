@@ -161,7 +161,12 @@ function App() {
       <AppLayout
         currentView={currentView}
         onNavigate={handleNavigate}
-        onAddPassword={() => setShowAddModal(true)}
+        onAddPassword={() => {
+          if (currentView !== "vault") {
+            setCurrentView("vault");
+          }
+          setShowAddModal(true);
+        }}
       >
         {pageContent}
       </AppLayout>
