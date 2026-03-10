@@ -1,0 +1,62 @@
+
+> passwordpal@0.1.0 lint
+> eslint . --report-unused-disable-directives --max-warnings 0
+
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/components/PasswordItem.tsx
+  30:45  error  'type' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/components/UnlockScreen.tsx
+  29:18  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/context/NotificationContext.tsx
+  23:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/AuditLogPage.tsx
+  25:52  error  '_onNavigate' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/LoginPage.tsx
+  100:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  135:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/PasswordGeneratorPage.tsx
+  112:8  warning  React Hook useEffect has a missing dependency: 'generatePassword'. Either include it or remove the dependency array                   react-hooks/exhaustive-deps
+  117:8  warning  React Hook useEffect has missing dependencies: 'generatePassword' and 'password'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/RecoveryPage.tsx
+  41:21  error  'salt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  65:23  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/RegisterPage.tsx
+  83:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/SecurityDashboardPage.tsx
+  56:8  warning  React Hook useEffect has a missing dependency: 'loadAndAnalyze'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/SettingsPage.tsx
+  134:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  168:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  197:18  error  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  197:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  455:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  475:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/pages/VaultPage.tsx
+   67:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:85  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  113:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/services/syncService.ts
+  107:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/tests/AddPasswordModal.test.tsx
+  2:37  error  'waitFor' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/prajan-karthik/MyFiles/Drive_Backup/College/Projects/SE_Project/PasswordPal_Frontend/src/tests/Toast.test.tsx
+  1:32  error  'vi' is defined but never used       @typescript-eslint/no-unused-vars
+  2:37  error  'waitFor' is defined but never used  @typescript-eslint/no-unused-vars
+  7:33  error  'type' is defined but never used     @typescript-eslint/no-unused-vars
+
+✖ 27 problems (24 errors, 3 warnings)
+
