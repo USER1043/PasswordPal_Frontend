@@ -13,6 +13,7 @@ import { authService } from "../services/authService";
 import * as totpService from "../services/totpService";
 import { useNotification } from "../context/NotificationContext";
 import apiClient from "../api/axiosClient";
+import { fetchVault, saveEntry } from "../services/vaultService";
 
 interface SettingsPageProps {
     onNavigate: (view: string) => void;
@@ -441,7 +442,6 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
     const doExport = async () => {
         setExportLoading(true);
         try {
-            const { fetchVault } = await import("../services/vaultService");
             const items = await fetchVault();
             if (items.length === 0) {
                 notifyError("Your vault is empty. Nothing to export.");
@@ -460,12 +460,12 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
             };
 
             const csvRows = items.map(item => [
-                escapeCSV(item.name),
-                escapeCSV(item.username),
-                escapeCSV(item.password),
-                escapeCSV(item.website_url),
-                escapeCSV(item.folder_name),
-                escapeCSV(item.notes)
+                escapeCSV(item.entry?.name),
+                escapeCSV(item.entry?.username),
+                escapeCSV(item.entry?.password),
+                escapeCSV(item.entry?.website_url),
+                escapeCSV(item.entry?.folder_name),
+                escapeCSV(item.entry?.notes)
             ].join(','));
 
             const csvContent = [headers.join(','), ...csvRows].join('\n');
@@ -570,7 +570,6 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
 
                                 if (passIdx === -1) { notifyError("CSV must have a password column"); return; }
 
-                                const { saveEntry } = await import("../services/vaultService");
                                 let imported = 0;
                                 for (let i = 1; i < lines.length; i++) {
                                     const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));

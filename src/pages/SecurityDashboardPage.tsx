@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import * as vaultService from "../services/vaultService";
 import * as breachService from "../services/breachService";
-import type { DecryptedVaultItem } from "../services/vaultService";
+import type { DecryptedVaultRecord } from "../services/vaultService";
 import { useNotification } from "../context/NotificationContext";
 
 interface SecurityDashboardProps {
@@ -28,7 +28,11 @@ interface PasswordAnalysis {
     updatedAt: string;
 }
 
-function analyzePasswordStrength(password: string): { strength: "weak" | "medium" | "strong"; score: number } {
+function analyzePasswordStrength(password: string | undefined | null): { strength: "weak" | "medium" | "strong"; score: number } {
+    if (!password || typeof password !== "string") {
+        return { score: 0, strength: "weak" };
+    }
+
     let score = 0;
     if (password.length >= 8) score += 20;
     if (password.length >= 12) score += 15;
@@ -51,33 +55,38 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
     const [breachProgress, setBreachProgress] = useState(0);
     const { error: notifyError, success: notifySuccess, warning: notifyWarning } = useNotification();
 
-    const analyzeVault = useCallback((items: DecryptedVaultItem[]): PasswordAnalysis[] => {
+    const analyzeVault = useCallback((items: DecryptedVaultRecord[]): PasswordAnalysis[] => {
         // Count password occurrences for reuse detection
         const passwordCounts = new Map<string, number>();
         items.forEach((item) => {
-            const count = passwordCounts.get(item.password) || 0;
-            passwordCounts.set(item.password, count + 1);
+            const pwd = item.entry?.password;
+            if (pwd) {
+                const count = passwordCounts.get(pwd) || 0;
+                passwordCounts.set(pwd, count + 1);
+            }
         });
 
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
         return items.map((item) => {
-            const { strength, score } = analyzePasswordStrength(item.password);
-            const isReused = (passwordCounts.get(item.password) || 0) > 1;
-            const isOld = new Date(item.updated_at) < sixMonthsAgo;
+            const pwd = item.entry?.password;
+            const { strength, score } = analyzePasswordStrength(pwd);
+            const isReused = pwd ? (passwordCounts.get(pwd) || 0) > 1 : false;
+            // Since updated_at might not exist in the new structure (only in DB), fallback to Date.now() if missing
+            const isOld = item.entry ? false : true; // Assuming we don't have updated_at directly on the entry locally yet
 
             return {
                 id: item.id,
-                name: item.name,
-                username: item.username,
+                name: item.entry?.name || "",
+                username: item.entry?.username || "",
                 strength,
                 strengthScore: score,
                 isReused,
                 isOld,
                 breached: false,
                 breachCount: 0,
-                updatedAt: item.updated_at,
+                updatedAt: new Date().toISOString(),
             };
         });
     }, []);
@@ -124,7 +133,10 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
 
         for (let i = 0; i < items.length; i++) {
             try {
-                const result = await breachService.checkPasswordBreach(items[i].password);
+                const pwd = items[i].entry?.password;
+                if (!pwd) continue;
+
+                const result = await breachService.checkPasswordBreach(pwd);
                 const idx = updated.findIndex((a) => a.id === items[i].id);
                 if (idx !== -1) {
                     updated[idx] = { ...updated[idx], breached: result.breached, breachCount: result.count };

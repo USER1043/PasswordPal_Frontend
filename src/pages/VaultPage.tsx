@@ -9,7 +9,7 @@ import {
 import PasswordItem from "../components/PasswordItem";
 import AddPasswordModal, { type PasswordData } from "../components/AddPasswordModal";
 import * as vaultService from "../services/vaultService";
-import type { DecryptedVaultItem, VaultEntry } from "../services/vaultService";
+import type { DecryptedVaultRecord, VaultEntry } from "../services/vaultService";
 import { useNotification } from "../context/NotificationContext";
 
 interface VaultPageProps {
@@ -18,18 +18,18 @@ interface VaultPageProps {
   setShowAddModal: (show: boolean) => void;
 }
 
-/** Convert a DecryptedVaultItem to the PasswordData shape the UI components expect */
-function toPasswordData(item: DecryptedVaultItem): PasswordData {
+/** Convert a DecryptedVaultRecord to the PasswordData shape the UI components expect */
+function toPasswordData(item: DecryptedVaultRecord): PasswordData {
   return {
     id: item.id,
-    name: item.name,
-    username: item.username,
-    password: item.password,
-    url: item.website_url,
-    folder: item.folder_name,
-    notes: item.notes,
+    name: item.entry?.name || "",
+    username: item.entry?.username || "",
+    password: item.entry?.password || "",
+    url: item.entry?.website_url || "",
+    folder: item.entry?.folder_name || "",
+    notes: item.entry?.notes || "",
     version: item.version,
-    updated_at: item.updated_at,
+    updated_at: new Date().toISOString(), // Fallback since updated_at isn't synced locally yet
   };
 }
 
@@ -89,12 +89,17 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
   ];
 
   const filteredPasswords = passwords.filter((pwd) => {
+    const pwdName = pwd?.name?.toLowerCase() ?? "";
+    const pwdUrl = pwd?.url?.toLowerCase() ?? "";
+    
     const matchesSearch =
-      pwd.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (pwd.url ? pwd.url.toLowerCase().includes(searchQuery.toLowerCase()) : false);
+      pwdName.includes(searchQuery.toLowerCase()) ||
+      pwdUrl.includes(searchQuery.toLowerCase());
+      
     const matchesFolder =
       selectedFolder === "all" ||
-      pwd.folder?.toLowerCase() === selectedFolder.toLowerCase();
+      pwd?.folder?.toLowerCase() === selectedFolder.toLowerCase();
+      
     return matchesSearch && matchesFolder;
   });
 

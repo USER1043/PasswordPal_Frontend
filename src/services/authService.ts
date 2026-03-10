@@ -3,7 +3,20 @@
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
-import { cacheAuthParams, getCachedAuthParams } from "./dbService";
+
+async function cacheAuthParams(email: string, salt: string, wrapped_mek: string) {
+    localStorage.setItem(`auth_salt_${email}`, salt);
+    localStorage.setItem(`auth_mek_${email}`, wrapped_mek);
+}
+
+async function getCachedAuthParams(email: string): Promise<{ salt: string; wrapped_mek: string } | null> {
+    const salt = localStorage.getItem(`auth_salt_${email}`);
+    const wrapped_mek = localStorage.getItem(`auth_mek_${email}`);
+    if (salt && wrapped_mek) {
+        return { salt, wrapped_mek };
+    }
+    return null;
+}
 
 export interface RegisterResponse {
     salt: string;
@@ -118,11 +131,7 @@ export const authService = {
                 auth_hash: loginData.auth_hash,
             }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
 
-            // If online login succeeds, cache the latest params for future offline use
-            await cacheAuthParams(email, salt, wrapped_mek);
-            localStorage.setItem("active_user", email);
-
-            // Check if MFA is required
+            // Check if MFA is required FIRST
             if (response.data?.mfa_required) {
                 return {
                     success: false,
@@ -131,10 +140,20 @@ export const authService = {
                 };
             }
 
+            // If online login succeeds and no MFA needed, cache the latest params for future offline use
+            try {
+                await cacheAuthParams(email, salt, wrapped_mek);
+                localStorage.setItem("active_user", email);
+            } catch (dbErr) {
+                console.error("Failed to cache auth params in SQLite:", dbErr);
+                // Safe to proceed, just won't be available offline next time
+            }
+
             return { success: true, isOfflineMode: false };
         } catch (err: any) {
              // If local decryption succeeded, but the network is completely down, log in Offline Mode
-             if (err.message === "Network Error" || !err.response) {
+             if (err.message === "Network Error" || err.message === "Failed to fetch") {
+                 localStorage.setItem("active_user", email);
                  return { success: true, isOfflineMode: true };
              }
              throw err;
