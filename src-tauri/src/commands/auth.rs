@@ -260,8 +260,7 @@ pub fn recover_vault_logic(
     let (auth_key, enc_key) = crypto::derive_keys_from_kek(&*new_kek);
 
     // 5. Wrap the EXISTING MEK with the new EncKey
-    let cipher = Aes256Gcm::new_from_slice(&*enc_key)
-        .map_err(|_| "Failed to create cipher")?;
+    let cipher = Aes256Gcm::new_from_slice(&*enc_key).map_err(|_| "Failed to create cipher")?;
     let mut nonce_bytes = [0u8; 12];
     OsRng
         .try_fill_bytes(&mut nonce_bytes)
@@ -306,4 +305,3 @@ pub fn recover_vault(
 
     Ok(response)
 }
-

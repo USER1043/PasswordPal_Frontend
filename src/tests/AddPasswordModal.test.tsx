@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AddPasswordModal from '../components/AddPasswordModal';
 import type { PasswordData } from '../components/AddPasswordModal';
 
@@ -217,7 +217,7 @@ describe('AddPasswordModal Component', () => {
         alertSpy.mockRestore();
     });
 
-    it('calls onSave with form data when all required fields are filled', () => {
+    it('calls onSave with form data when all required fields are filled', async () => {
         render(
             <AddPasswordModal
                 isOpen={true}
@@ -240,15 +240,19 @@ describe('AddPasswordModal Component', () => {
         const saveButton = screen.getByText('Save');
         fireEvent.click(saveButton);
 
-        expect(mockOnSave).toHaveBeenCalledWith(
-            expect.objectContaining({
-                name: 'GitHub',
-                username: 'user@github.com',
-                password: 'SecurePass123!'
-            })
-        );
+        // handleSubmit is async (awaits breach check) — must waitFor the callback
+        await waitFor(() => {
+            expect(mockOnSave).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    name: 'GitHub',
+                    username: 'user@github.com',
+                    password: 'SecurePass123!'
+                })
+            );
+        });
         expect(mockOnClose).toHaveBeenCalled();
     });
+
 
     // Edge Case: Password Strength Calculation
     it('calculates password strength correctly', async () => {
