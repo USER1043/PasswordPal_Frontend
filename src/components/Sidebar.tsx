@@ -2,9 +2,10 @@
 // Sidebar — Main navigation with real logout via backend + Rust
 // ============================================================================
 import {
-    Shield, Lock, Zap, Settings, LogOut, Plus, History
+    Lock, Zap, Shield, Settings, LogOut, Plus, History
 } from "lucide-react";
 import { authService } from "../services/authService";
+import AppLogo from "./common/AppLogo";
 
 interface SidebarProps {
     currentView: string;
@@ -34,14 +35,8 @@ export default function Sidebar({ currentView, onNavigate, onAddPassword }: Side
     return (
         <div className="w-64 bg-slate-800/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col h-full">
             {/* App Logo/Header */}
-            <div className="p-6 flex items-center gap-3">
-                <div className="relative">
-                    <Shield className="w-8 h-8 text-purple-400" strokeWidth={2} />
-                    <div className="absolute inset-0 bg-purple-500 blur-md opacity-20"></div>
-                </div>
-                <span className="text-xl font-bold text-white tracking-tight">
-                    PasswordPal
-                </span>
+            <div className="p-6">
+                <AppLogo size="sm" />
             </div>
 
             {/* Main Navigation */}
