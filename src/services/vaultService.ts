@@ -59,6 +59,12 @@ export async function syncOfflineVault(): Promise<void> {
             console.log(`Syncing ${pendingItems.length} offline changes...`);
 
             for (const item of pendingItems) {
+                if (!navigator.onLine) {
+                    console.warn("Network offline during sync. Breaking loop.");
+                    syncRequested = false;
+                    break;
+                }
+
                 try {
                     if (item.sync_status === 'pending_delete') {
                         await apiClient.delete(`/api/vault/${item.id}`);

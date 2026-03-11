@@ -19,6 +19,8 @@ import UnlockScreen from "./components/UnlockScreen";
 import { SESSION_REVOKED_EVENT, wipe_sensitive_data } from "./api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
 import { authService } from "./services/authService";
+import { syncOfflineVault } from "./services/vaultService";
+import { useConnectivity } from "./hooks/useConnectivity";
 
 const AUTO_LOCK_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const CLIPBOARD_CLEAR_TIMEOUT_MS = 30 * 1000; // 30 seconds
@@ -30,6 +32,20 @@ function App() {
   const [isLocked, setIsLocked] = useState(false);
   const autoLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isOnline, lastChanged } = useConnectivity();
+
+  // Connectivity Observer Effect
+  useEffect(() => {
+    if (isOnline) {
+      syncOfflineVault().catch((e: unknown) => console.error("Auto-sync failed:", e));
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("notify", {
+          detail: { message: "Working Offline", type: "warning" },
+        })
+      );
+    }
+  }, [isOnline, lastChanged]);
 
   // Auto-lock: Reset timer on user activity
   const resetAutoLockTimer = useCallback(() => {
