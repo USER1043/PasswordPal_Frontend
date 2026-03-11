@@ -34,11 +34,16 @@ export default function PasswordItem({
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const [imageError, setImageError] = useState(false);
+
+    // Get the base backend url from vite env, fallback to localhost
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+
     const getFavicon = (url?: string) => {
         if (!url) return null;
         try {
             const domain = new URL(url).hostname;
-            return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+            return `${backendUrl}/api/favicon?domain=${domain}`;
         } catch {
             return null;
         }
@@ -49,8 +54,13 @@ export default function PasswordItem({
             <div className="flex items-start gap-4">
                 {/* Icon */}
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-                    {getFavicon(url) ? (
-                        <img src={getFavicon(url)!} alt="" className="w-6 h-6" />
+                    {getFavicon(url) && !imageError ? (
+                        <img 
+                            src={getFavicon(url)!} 
+                            alt="" 
+                            className="w-6 h-6" 
+                            onError={() => setImageError(true)}
+                        />
                     ) : (
                         <Globe className="w-6 h-6 text-purple-400" />
                     )}
