@@ -109,7 +109,7 @@ export const authService = {
      * Step 2 of Login: Derive keys in Rust, authenticate with backend.
      * Returns login result indicating if MFA is required or if it's Offline Mode.
      */
-    async login(email: string, masterPassword: string): Promise<LoginResult> {
+    async login(email: string, masterPassword: string, deviceFingerprint?: string): Promise<LoginResult> {
         // 1. Fetch Salt & Wrapped MEK (online or offline fallback)
         const params = await this.getParams(email);
         const { salt, wrapped_mek } = params;
@@ -128,19 +128,28 @@ export const authService = {
             // If local decryption fails (wrong password), the backend is never natively reached.
             // We must intentionally hit /auth/login with a bogus hash so the backend
             // records the failed attempt in the Audit Log and triggers rate-limiting.
+            const headers: Record<string, string> = {};
+            if (deviceFingerprint) headers["User-Agent"] = deviceFingerprint;
             await apiClient.post("/auth/login", {
                 email,
                 auth_hash: "LOCAL_DECRYPTION_FAILED",
-            }).catch(() => {}); // Suppress the 401/Network response
+            }, { headers }).catch(() => {}); // Suppress the 401/Network response
             throw err; // Re-throw the Rust error for the UI to catch
         }
 
         // 3. Send Auth Hash to Backend
         try {
+            const headers: Record<string, string> = {};
+            if (deviceFingerprint) {
+                // The backend uses req.headers['user-agent'] for the deviceName/fingerprint in deviceModel.js 
+                // We override User-Agent here for fresh login isolations
+                headers["User-Agent"] = deviceFingerprint;
+            }
+
             const response = await apiClient.post("/auth/login", {
                 email,
                 auth_hash: loginData.auth_hash,
-            }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
+            }, { headers }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
 
             // Check if MFA is required FIRST
             if (response.data?.mfa_required) {
@@ -178,19 +187,33 @@ export const authService = {
     },
 
     /**
-     * Logout — clear backend session + lock Rust vault
+     * Logout — Scorched Earth: clear backend session + lock Rust vault + clear local SQLite DB
      */
     async logout(): Promise<void> {
-        localStorage.removeItem("offline_token");
+        // 1. Explicitly clear backend HttpOnly cookies first
         try {
             await apiClient.post("/auth/logout");
         } catch (err) {
             console.error("Backend logout failed:", err);
         }
+
+        // 2. Clear all sensitive local storage
+        localStorage.removeItem("offline_token");
+        localStorage.removeItem("active_user");
+        sessionStorage.clear();
+
+        // 3. Lock memory in Rust
         try {
             await invoke("lock_vault");
         } catch (err) {
             console.error("Failed to lock vault:", err);
+        }
+
+        // 4. Destroy local SQLite cache for complete Account Isolation
+        try {
+            await invoke("clear_local_auth_cache");
+        } catch (err) {
+            console.error("Failed to clear local SQLite caches:", err);
         }
     },
 

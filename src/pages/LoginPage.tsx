@@ -85,7 +85,10 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
 
     setLoading(true);
     try {
-      const result = await authService.login(email, password);
+      // Generate a fresh, isolated device fingerprint purely for this specific login attempt
+      const deviceId = crypto.randomUUID();
+
+      const result = await authService.login(email, password, deviceId);
 
       if (result.mfa_required) {
         setMfaRequired(true);

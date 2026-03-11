@@ -40,7 +40,8 @@ pub fn run() {
             db::get_pending_sync_queue,
             db::mark_synced_local,
             db::cache_auth_params,
-            db::get_cached_auth_params
+            db::get_cached_auth_params,
+            db::clear_local_auth_cache
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
