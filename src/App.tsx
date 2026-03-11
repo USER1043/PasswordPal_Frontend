@@ -20,7 +20,7 @@ import { SESSION_REVOKED_EVENT, wipe_sensitive_data } from "./api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
 import { authService } from "./services/authService";
 import { syncOfflineVault } from "./services/vaultService";
-import { useConnectivity } from "./hooks/useConnectivity";
+import { isServerReachable } from "./services/networkProbe";
 
 const AUTO_LOCK_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const CLIPBOARD_CLEAR_TIMEOUT_MS = 30 * 1000; // 30 seconds
@@ -32,20 +32,37 @@ function App() {
   const [isLocked, setIsLocked] = useState(false);
   const autoLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { isOnline, lastChanged } = useConnectivity();
 
-  // Connectivity Observer Effect
+  // Connectivity Observer Effect (Polling)
   useEffect(() => {
-    if (isOnline) {
-      syncOfflineVault().catch((e: unknown) => console.error("Auto-sync failed:", e));
-    } else {
-      window.dispatchEvent(
-        new CustomEvent("notify", {
-          detail: { message: "Working Offline", type: "warning" },
-        })
-      );
-    }
-  }, [isOnline, lastChanged]);
+    let wasOffline = false;
+
+    // Initial check to bootstrap the SyncStatus child component
+    isServerReachable().then(reachable => {
+        window.dispatchEvent(new CustomEvent('network-status', { detail: reachable }));
+    });
+
+    const interval = setInterval(async () => {
+      const reachable = await isServerReachable();
+
+      if (!reachable) {
+        wasOffline = true;
+        window.dispatchEvent(new CustomEvent('network-status', { detail: false }));
+      } else {
+        if (wasOffline) {
+          wasOffline = false;
+          console.log("[Sync] Reconnected — triggering offline vault sync");
+          // The critical fix: By invoking syncOfflineVault() FIRST, it synchronously emits 
+          // the 'sync-start' event before we emit 'network-status'. This allows React to 
+          // seamlessly batch the state transitions and completely eliminates the "Cloud Synced" flicker.
+          syncOfflineVault().catch((e: unknown) => console.error("Auto-sync failed:", e));
+        }
+        window.dispatchEvent(new CustomEvent('network-status', { detail: true }));
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-lock: Reset timer on user activity
   const resetAutoLockTimer = useCallback(() => {
