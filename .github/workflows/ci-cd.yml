@@ -154,6 +154,24 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
+      - name: Set App Version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const newVersion = `0.1.${context.runNumber}`;
+            
+            const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+            pkg.version = newVersion;
+            fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+            
+            const tauri = JSON.parse(fs.readFileSync('./src-tauri/tauri.conf.json', 'utf8'));
+            tauri.version = newVersion;
+            fs.writeFileSync('./src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2));
+            
+            let cargo = fs.readFileSync('./src-tauri/Cargo.toml', 'utf8');
+            cargo = cargo.replace(/^version\s*=\s*".*"/m, `version = "${newVersion}"`);
+            fs.writeFileSync('./src-tauri/Cargo.toml', cargo);
 
       - name: Install Node dependencies
         run: npm ci
@@ -203,9 +221,9 @@ jobs:
         with:
           path: release-artifacts/
 
-      - name: Generate release tag from commit SHA
+      - name: Generate release tag from build number
         id: tag
-        run: echo "tag=build-$(echo ${{ github.sha }} | cut -c1-8)" >> "$GITHUB_OUTPUT"
+        run: echo "tag=v0.1.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
