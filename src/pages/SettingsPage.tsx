@@ -14,6 +14,7 @@ import * as totpService from "../services/totpService";
 import { useNotification } from "../context/NotificationContext";
 import apiClient from "../api/axiosClient";
 import { fetchVault, saveEntry } from "../services/vaultService";
+import { isServerReachable } from "../services/networkProbe";
 
 interface SettingsPageProps {
     onNavigate: (view: string) => void;
@@ -23,7 +24,11 @@ interface SettingsPageProps {
 export default function SettingsPage({ onNavigate, userEmail = "" }: SettingsPageProps) {
     const [activeTab, setActiveTab] = useState("security");
     const { success, error: notifyError } = useNotification();
-    const isOffline = !!localStorage.getItem("offline_token");
+    const [isOffline, setIsOffline] = useState(false);
+
+    useEffect(() => {
+        isServerReachable().then(reachable => setIsOffline(!reachable));
+    }, []);
 
     const tabs = [
         { id: "security", label: "Security", icon: Shield },

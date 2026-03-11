@@ -10,6 +10,7 @@ import * as vaultService from "../services/vaultService";
 import * as breachService from "../services/breachService";
 import type { DecryptedVaultRecord } from "../services/vaultService";
 import { useNotification } from "../context/NotificationContext";
+import { isServerReachable } from "../services/networkProbe";
 
 interface SecurityDashboardProps {
     onNavigate: (view: string) => void;
@@ -54,7 +55,7 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
     const [breachChecking, setBreachChecking] = useState(false);
     const [breachProgress, setBreachProgress] = useState(0);
     const { error: notifyError, success: notifySuccess, warning: notifyWarning } = useNotification();
-    const isOffline = !!localStorage.getItem("offline_token");
+    const [isOffline, setIsOffline] = useState(false);
 
     const analyzeVault = useCallback((items: DecryptedVaultRecord[]): PasswordAnalysis[] => {
         // Count password occurrences for reuse detection
@@ -95,12 +96,23 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
     const loadAndAnalyze = useCallback(async () => {
         setLoading(true);
         try {
+            const reachable = await isServerReachable();
+            setIsOffline(!reachable);
+            
             const items = await vaultService.fetchVault();
             const analyzed = analyzeVault(items);
             setAnalyses(analyzed);
-        } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
             console.error("Failed to load vault for analysis:", err);
-            notifyError("Failed to load vault data for security analysis");
+            // Only notify error if we're actually online and it failed.
+            // If we're offline, fetchVault falls back to local Rust db which should work,
+            // but if it still throws, we should surface it. However, we already have an 
+            // `isOffline` early return check in the UI, so this is just a safety net.
+            const isReachable = await isServerReachable();
+            if (isReachable) {
+                notifyError("Failed to load vault data for security analysis");
+            }
         } finally {
             setLoading(false);
         }

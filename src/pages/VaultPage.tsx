@@ -11,6 +11,7 @@ import AddPasswordModal, { type PasswordData } from "../components/AddPasswordMo
 import * as vaultService from "../services/vaultService";
 import type { DecryptedVaultRecord, VaultEntry } from "../services/vaultService";
 import { useNotification } from "../context/NotificationContext";
+import { isServerReachable } from "../services/networkProbe";
 
 interface VaultPageProps {
   onNavigate: (view: string) => void;
@@ -64,9 +65,13 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     try {
       const items = await vaultService.fetchVault();
       setPasswords(items.map(toPasswordData));
-    } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
       console.error("Failed to load vault:", err);
-      notifyErrorRef.current("Failed to load vault data");
+      const online = await isServerReachable();
+      if (online) {
+        notifyErrorRef.current("Failed to load vault data");
+      }
     } finally {
       setLoading(false);
     }

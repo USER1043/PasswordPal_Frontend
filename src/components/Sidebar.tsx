@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { authService } from "../services/authService";
 import AppLogo from "./common/AppLogo";
+import SyncStatus from "./SyncStatus";
 
 interface SidebarProps {
     currentView: string;
@@ -77,8 +78,9 @@ export default function Sidebar({ currentView, onNavigate, onAddPassword }: Side
                 </div>
             </div>
 
-            {/* User Footer */}
-            <div className="p-4 border-t border-slate-700/50">
+            {/* User Footer & Sync Status */}
+            <div className="p-4 border-t border-slate-700/50 space-y-2">
+                <SyncStatus />
                 <button
                     onClick={handleSignOut}
                     className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-colors group"
