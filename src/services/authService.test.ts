@@ -51,7 +51,7 @@ describe('authService - Session Isolation', () => {
     });
 
     it('should handle backend logout failure gracefully and continue wiping local data', async () => {
-      // @ts-ignore
+      // @ts-expect-error - Mocking rejected value on vi.fn()
       apiClient.post.mockRejectedValueOnce(new Error('Network error'));
       
       localStorage.setItem('active_user', 'user@example.com');

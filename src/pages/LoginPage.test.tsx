@@ -40,7 +40,7 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
   };
 
   it('generates a fresh device UUID on login and passes it to authService.login', async () => {
-    // @ts-ignore
+    // @ts-expect-error - Mocking login result which is partially typed here
     authService.login.mockResolvedValueOnce({ success: true, mfa_required: false });
 
     // Mock randomUUID to ensure we can assert against a predictable value

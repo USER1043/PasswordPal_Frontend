@@ -315,7 +315,9 @@ pub fn get_cached_auth_params(
 pub fn clear_local_auth_cache(state: State<'_, DbState>) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
     // Execute deletions to isolate account data natively
-    conn.execute("DELETE FROM auth_cache", params![]).map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM local_vault", params![]).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM auth_cache", params![])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM local_vault", params![])
+        .map_err(|e| e.to_string())?;
     Ok(())
 }

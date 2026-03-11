@@ -75,12 +75,13 @@ export async function syncOfflineVault(): Promise<void> {
                         await apiClient.post("/api/vault", payload);
                         await invoke("mark_synced_local", { id: item.id });
                     }
-                } catch (err: any) {
-                    if (err.message === "Network Error" || !err.response) {
+                } catch (err: unknown) {
+                    const error = err as { message?: string; response?: { status?: number } };
+                    if (error.message === "Network Error" || !error.response) {
                         console.warn("Network lost during sync. Aborting.");
                         syncRequested = false; // break outer loop if offline
                         break;
-                    } else if (err.response?.status === 409) {
+                    } else if (error.response?.status === 409) {
                         console.warn(`Version conflict syncing item ${item.id}. Awaiting manual resolution.`);
 
                         // 1. Download the server's version of the record

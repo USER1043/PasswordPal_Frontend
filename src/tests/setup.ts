@@ -9,8 +9,8 @@ import { vi } from 'vitest';
 // Mock window.crypto.randomUUID and getRandomValues
 Object.defineProperty(window, 'crypto', {
     value: {
-        randomUUID: () => 'mock-uuid-1234-5678',
-        getRandomValues: (buffer: any) => {
+        randomUUID: () => '12345678-1234-1234-1234-123456789012',
+        getRandomValues: (buffer: Uint8Array) => {
             for (let i = 0; i < buffer.length; i++) {
                 buffer[i] = Math.floor(Math.random() * 256);
             }
