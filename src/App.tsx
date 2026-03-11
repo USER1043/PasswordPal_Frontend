@@ -3,6 +3,8 @@
 // ============================================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import { NotificationProvider } from "./context/NotificationContext";
+import { ConflictProvider } from "./context/ConflictContext";
+import ConflictResolver from "./components/ConflictResolver";
 import ToastContainer from "./components/ToastContainer";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -174,16 +176,19 @@ function App() {
   };
 
   return (
-    <NotificationProvider>
-      {isLocked && (
-        <UnlockScreen
-          onUnlock={handleUnlock}
-          onCancel={handleUnlockCancel}
-        />
-      )}
-      {renderContent()}
-      <ToastContainer />
-    </NotificationProvider>
+    <ConflictProvider>
+      <NotificationProvider>
+        {isLocked && (
+          <UnlockScreen
+            onUnlock={handleUnlock}
+            onCancel={handleUnlockCancel}
+          />
+        )}
+        {renderContent()}
+        <ConflictResolver />
+        <ToastContainer />
+      </NotificationProvider>
+    </ConflictProvider>
   );
 }
 

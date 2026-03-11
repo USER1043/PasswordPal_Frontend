@@ -75,15 +75,86 @@ export async function syncOfflineVault(): Promise<void> {
                         await apiClient.post("/api/vault", payload);
                         await invoke("mark_synced_local", { id: item.id });
                     }
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } catch (err: any) {
                     if (err.message === "Network Error" || !err.response) {
                         console.warn("Network lost during sync. Aborting.");
                         syncRequested = false; // break outer loop if offline
                         break;
                     } else if (err.response?.status === 409) {
-                        console.warn(`Version conflict syncing item ${item.id}. Reverting local change.`);
-                        await invoke("mark_synced_local", { id: item.id });
+                        console.warn(`Version conflict syncing item ${item.id}. Awaiting manual resolution.`);
+
+                        // 1. Download the server's version of the record
+                        const serverRes = await apiClient.get(`/api/vault/${item.id}`);
+                        const serverRecord = serverRes.data.item || serverRes.data.data || serverRes.data;
+
+                        // 2. Decode local encrypted data
+                        const nonceBytes = Uint8Array.from(atob(item.nonce), c => c.charCodeAt(0));
+                        const cipherBytes = Uint8Array.from(atob(item.encrypted_data), c => c.charCodeAt(0));
+                        const combined = new Uint8Array(nonceBytes.length + cipherBytes.length);
+                        combined.set(nonceBytes);
+                        combined.set(cipherBytes, nonceBytes.length);
+                        const combinedB64 = btoa(String.fromCharCode(...combined));
+
+                        // Decrypt local entry
+                        const localEntry = await invoke<VaultEntry>("decrypt_entry", { blobB64: combinedB64 });
+
+                        // 3. Decode server encrypted data
+                        const serverNonceBytes = Uint8Array.from(atob(serverRecord.nonce), c => c.charCodeAt(0));
+                        const serverCipherBytes = Uint8Array.from(atob(serverRecord.encrypted_data), c => c.charCodeAt(0));
+                        const serverCombined = new Uint8Array(serverNonceBytes.length + serverCipherBytes.length);
+                        serverCombined.set(serverNonceBytes);
+                        serverCombined.set(serverCipherBytes, serverNonceBytes.length);
+                        const serverCombinedB64 = btoa(String.fromCharCode(...serverCombined));
+                        
+                        // Decrypt server entry
+                        const serverEntry = await invoke<VaultEntry>("decrypt_entry", { blobB64: serverCombinedB64 });
+
+                        // 4. Pause the sync and wait for manual user resolution via ConflictContext overlay
+                        const choice = await new Promise<'local' | 'server'>((resolve) => {
+                            window.dispatchEvent(new CustomEvent('sync-conflict', {
+                                detail: {
+                                    serverData: serverEntry,
+                                    localData: localEntry,
+                                    recordId: item.id,
+                                    serverVersion: serverRecord.version,
+                                    resolve
+                                }
+                            }));
+                        });
+
+                        // 5. Resolution Logic
+                        if (choice === 'local') {
+                            const newVersion = serverRecord.version + 1;
+                            // Re-submit the sync request with version = server_version + 1
+                            const localPayload = {
+                                id: item.id,
+                                encrypted_data: item.encrypted_data, 
+                                nonce: item.nonce,
+                                version: newVersion,
+                                record_type: item.record_type,
+                            };
+                            await apiClient.post("/api/vault", localPayload);
+                            
+                            // Update local DB to reflect the new version
+                            await invoke("save_entry_local", {
+                                entryId: item.id,
+                                userId,
+                                entry: localEntry,
+                                version: newVersion,
+                                recordType: item.record_type,
+                                syncStatus: "synced"
+                            });
+                        } else {
+                            // Overwrite the local SQLite record with the server's data
+                            await invoke("save_server_record_local", {
+                                id: item.id,
+                                userId,
+                                encryptedData: serverRecord.encrypted_data,
+                                nonce: serverRecord.nonce,
+                                version: serverRecord.version,
+                                recordType: serverRecord.record_type || 'credential'
+                            });
+                        }
                     } else {
                         console.error(`Failed to sync item ${item.id}:`, err);
                     }
