@@ -45,9 +45,9 @@ describe('authService - Session Isolation', () => {
       expect(invoke).toHaveBeenCalledWith('lock_vault');
     });
 
-    it('should invoke clear_local_auth_cache in Rust to destroy local SQLite data', async () => {
+    it('should NOT invoke clear_local_auth_cache in rust to preserve offline SQLite caching', async () => {
       await authService.logout();
-      expect(invoke).toHaveBeenCalledWith('clear_local_auth_cache');
+      expect(invoke).not.toHaveBeenCalledWith('clear_local_auth_cache');
     });
 
     it('should handle backend logout failure gracefully and continue wiping local data', async () => {
@@ -61,7 +61,7 @@ describe('authService - Session Isolation', () => {
       // Despite backend failing, it should still clear local storage and Rust caches
       expect(localStorage.getItem('active_user')).toBeNull();
       expect(invoke).toHaveBeenCalledWith('lock_vault');
-      expect(invoke).toHaveBeenCalledWith('clear_local_auth_cache');
+      expect(invoke).not.toHaveBeenCalledWith('clear_local_auth_cache');
     });
   });
 });
