@@ -1,5 +1,6 @@
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
+import { isServerReachable } from "./networkProbe";
 
 export interface VaultEntry {
     name: string;
@@ -33,7 +34,7 @@ function getActiveUserEmail(): string {
     return localStorage.getItem("active_user") || "unknown";
 }
 
-let isSyncing = false;
+export let isSyncing = false;
 let syncRequested = false;
 
 /**
@@ -47,6 +48,7 @@ export async function syncOfflineVault(): Promise<void> {
     }
     
     isSyncing = true;
+    window.dispatchEvent(new Event('sync-start'));
     const userId = getActiveUserEmail();
 
     try {
@@ -59,6 +61,13 @@ export async function syncOfflineVault(): Promise<void> {
             console.log(`Syncing ${pendingItems.length} offline changes...`);
 
             for (const item of pendingItems) {
+                const reachable = await isServerReachable();
+                if (!reachable) {
+                    console.warn("Network offline during sync. Breaking loop.");
+                    syncRequested = false;
+                    break;
+                }
+
                 try {
                     if (item.sync_status === 'pending_delete') {
                         await apiClient.delete(`/api/vault/${item.id}`);
@@ -77,8 +86,8 @@ export async function syncOfflineVault(): Promise<void> {
                     }
                 } catch (err: unknown) {
                     const error = err as { message?: string; response?: { status?: number } };
-                    if (error.message === "Network Error" || !error.response) {
-                        console.warn("Network lost during sync. Aborting.");
+                    if (error.message === "Network Error" || !error.response || error.response?.status === 503) {
+                        console.warn("Network lost during sync (503/Backend DB Down). Aborting.");
                         syncRequested = false; // break outer loop if offline
                         break;
                     } else if (error.response?.status === 409) {
@@ -164,6 +173,7 @@ export async function syncOfflineVault(): Promise<void> {
         } while (syncRequested);
     } finally {
         isSyncing = false;
+        window.dispatchEvent(new Event('sync-complete'));
     }
 }
 
@@ -198,15 +208,21 @@ export async function fetchVault(): Promise<DecryptedVaultRecord[]> {
         }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-         if (err.message === "Network Error" || !err.response) {
+         if (err.message === "Network Error" || err.code === "ERR_NETWORK" || !err.response || err.response?.status === 503) {
             console.warn("Offline mode: Fetching natively from Rust local_vault.");
          } else {
-            throw err;
+            console.error("fetchVault backend error:", err);
+            // Don't throw if we can still try to return local Rust data
          }
     }
 
-    // Call Rust to retrieve the completely clean, decrypted list from local_vault
-    return invoke("fetch_vault_local", { userId });
+    try {
+        // Call Rust to retrieve the completely clean, decrypted list from local_vault
+        return await invoke("fetch_vault_local", { userId });
+    } catch (e) {
+        console.error("Failed to fetch from local Rust DB:", e);
+        return [];
+    }
 }
 
 /**

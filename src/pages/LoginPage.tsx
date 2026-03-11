@@ -108,6 +108,16 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         notifyError("Email or password incorrect");
         return;
       }
+      
+      if (err instanceof Error) {
+        if (err.message.includes("No offline login data")) {
+          notifyError("No connection to server, and no offline data exists for this email.");
+          return;
+        } else if (err.message.includes("Invalid offline master password signature.")) {
+          notifyError("Email or password incorrect");
+          return;
+        }
+      }
 
       // Handle Backend HTTP errors
       const status = (err as { response?: { status?: number } }).response?.status;

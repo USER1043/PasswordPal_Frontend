@@ -7,6 +7,7 @@ import {
     ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import apiClient from "../api/axiosClient";
+import { isServerReachable } from "../services/networkProbe";
 
 interface AuditLog {
     id: string;
@@ -31,12 +32,19 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
     const [totalFailed, setTotalFailed] = useState(0);
     const [page, setPage] = useState(0);
     const [error, setError] = useState("");
-    const isOffline = !!localStorage.getItem("offline_token");
+    const [isOffline, setIsOffline] = useState(false);
 
     const fetchLogs = async (pageNum: number) => {
         setLoading(true);
         setError("");
         try {
+            const reachable = await isServerReachable();
+            setIsOffline(!reachable);
+            if (!reachable) {
+                setLoading(false);
+                return;
+            }
+
             const response = await apiClient.get("/api/audit-logs", {
                 params: { limit: PAGE_SIZE.toString(), offset: (pageNum * PAGE_SIZE).toString() },
             });

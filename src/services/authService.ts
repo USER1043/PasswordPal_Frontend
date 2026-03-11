@@ -3,6 +3,20 @@
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
+import { isServerReachable } from "./networkProbe";
+
+// Reusable network error classifier
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isNetworkFailure(err: any): boolean {
+    return (
+        !err.response ||
+        err.response.status === 503 || // Service Unavailable (triggered by DB disconnects)
+        err.code === "ERR_NETWORK" ||
+        err.code === "ECONNABORTED" ||
+        err.code === "ECONNREFUSED" ||
+        err.message?.toLowerCase().includes("network error")
+    );
+}
 
 async function cacheAuthParams(email: string, salt: string, wrapped_mek: string, auth_hash: string = "") {
     try {
@@ -54,8 +68,6 @@ export const authService = {
             password: masterPassword,
         });
 
-        // Hash the recovery key (raw MEK base64) with SHA-256 so the backend
-        // can verify it later without ever seeing the raw key.
         const recoveryKeyBytes = new TextEncoder().encode(verifyKeys.recovery_key);
         const hashBuffer = await crypto.subtle.digest("SHA-256", recoveryKeyBytes);
         const recoveryKeyHash = Array.from(new Uint8Array(hashBuffer))
@@ -70,7 +82,6 @@ export const authService = {
             recovery_key_hash: recoveryKeyHash,
         });
 
-        // Cache the params locally instantly so offline mode works immediately after registration
         await cacheAuthParams(email, verifyKeys.salt, verifyKeys.wrapped_mek, verifyKeys.auth_hash);
 
         return verifyKeys.recovery_key;
@@ -80,28 +91,40 @@ export const authService = {
      * Step 1 of Login: Get authentication parameters (salt + wrapped MEK)
      */
     async getParams(email: string): Promise<AuthParams> {
+        const getOfflineParams = async () => {
+            console.warn("Offline mode: Fetching auth params from native SQLite cache");
+            try {
+                const cached = await invoke<{ salt: string; wrapped_mek: string; local_password_hash: string }>("get_cached_auth_params", { email });
+                if (cached) {
+                    return { 
+                        salt: cached.salt, 
+                        wrapped_mek: cached.wrapped_mek,
+                        local_password_hash: cached.local_password_hash
+                    } as AuthParams & { local_password_hash: string };
+                }
+            } catch (dbErr) {
+                console.error("No offline auth params found:", dbErr);
+            }
+            throw new Error("No offline login data available for this email.");
+        };
+
+        const online = await isServerReachable();
+
+        if (!online) {
+            console.warn("[Auth] Probe failed — entering offline mode for getParams");
+            return getOfflineParams();
+        }
+
         try {
             const response = await apiClient.get("/auth/params", { params: { email } }) as ApiResponse<AuthParams>;
             return response.data;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
-            // If the network is down or API fails, try the SQLite offline cache
-            if (err.message === "Network Error" || !err.response) {
-                console.warn("Offline mode: Fetching auth params from native SQLite cache");
-                try {
-                    const cached = await invoke<{ salt: string; wrapped_mek: string; local_password_hash: string }>("get_cached_auth_params", { email });
-                    if (cached) {
-                        return { 
-                            salt: cached.salt, 
-                            wrapped_mek: cached.wrapped_mek,
-                            local_password_hash: cached.local_password_hash
-                        } as AuthParams & { local_password_hash: string };
-                    }
-                } catch (dbErr) {
-                    console.error("No offline auth params found:", dbErr);
-                }
+            if (isNetworkFailure(err)) {
+                console.warn("[Auth] Axios failed after probe — race condition fallback");
+                return getOfflineParams();
             }
-            throw err;
+            throw err; // 401, 404, 500 etc — real server error, bubble it up
         }
     },
 
@@ -110,13 +133,22 @@ export const authService = {
      * Returns login result indicating if MFA is required or if it's Offline Mode.
      */
     async login(email: string, masterPassword: string, deviceFingerprint?: string): Promise<LoginResult> {
-        // 1. Fetch Salt & Wrapped MEK (online or offline fallback)
         const params = await this.getParams(email);
         const { salt, wrapped_mek } = params;
         const localPasswordHash = (params as unknown as Record<string, unknown>).local_password_hash as string | undefined;
 
-        // 2. Derive Key & Unlock Vault in Rust
+        let finalDeviceName = deviceFingerprint || "Unknown Device";
+        try {
+            const identity = await invoke<{device_id: string, device_name: string}>("get_local_identity");
+            // Formats to: linux/prajan-karthik (ID: 123e4567-e89b-12d3... )
+            finalDeviceName = `${identity.device_name} (ID: ${identity.device_id})`;
+        } catch (e) {
+            console.error("Failed to fetch persistent device identity from SQLite:", e);
+        }
+
         let loginData: LoginResponse;
+
+        // Try decryption natively in Rust
         try {
             loginData = await invoke<LoginResponse>("login_vault", {
                 password: masterPassword,
@@ -124,34 +156,44 @@ export const authService = {
                 wrappedMek: wrapped_mek,
             });
         } catch (err) {
-            // ZERO-KNOWLEDGE AUDIT FIX:
-            // If local decryption fails (wrong password), the backend is never natively reached.
-            // We must intentionally hit /auth/login with a bogus hash so the backend
-            // records the failed attempt in the Audit Log and triggers rate-limiting.
-            const headers: Record<string, string> = {};
-            if (deviceFingerprint) headers["User-Agent"] = deviceFingerprint;
-            await apiClient.post("/auth/login", {
-                email,
-                auth_hash: "LOCAL_DECRYPTION_FAILED",
-            }, { headers }).catch(() => {}); // Suppress the 401/Network response
-            throw err; // Re-throw the Rust error for the UI to catch
+            // ZERO-KNOWLEDGE AUDIT FIX
+            // If local decryption fails but server is alive, intentionally hit the server to log the failure
+            const isReachable = await isServerReachable();
+            if (isReachable) {
+                const headers: Record<string, string> = { "User-Agent": finalDeviceName };
+                await apiClient.post("/auth/login", {
+                    email,
+                    auth_hash: "LOCAL_DECRYPTION_FAILED",
+                }, { headers }).catch(() => {});
+            }
+            throw err;
         }
 
-        // 3. Send Auth Hash to Backend
-        try {
-            const headers: Record<string, string> = {};
-            if (deviceFingerprint) {
-                // The backend uses req.headers['user-agent'] for the deviceName/fingerprint in deviceModel.js 
-                // We override User-Agent here for fresh login isolations
-                headers["User-Agent"] = deviceFingerprint;
+        const offlineLogin = () => {
+            if (localPasswordHash && localPasswordHash === loginData.auth_hash) {
+                localStorage.setItem("active_user", email);
+                localStorage.setItem("offline_token", "mock-offline-token-" + Date.now());
+                return { success: true, isOfflineMode: true };
+            } else {
+                throw new Error("Invalid offline master password signature.");
             }
+        };
+
+        const online = await isServerReachable();
+
+        if (!online) {
+            console.warn("[Auth] Probe failed — entering offline mode for login");
+            return offlineLogin();
+        }
+
+        try {
+            const headers: Record<string, string> = { "User-Agent": finalDeviceName };
 
             const response = await apiClient.post("/auth/login", {
                 email,
                 auth_hash: loginData.auth_hash,
             }, { headers }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
 
-            // Check if MFA is required FIRST
             if (response.data?.mfa_required) {
                 return {
                     success: false,
@@ -160,7 +202,6 @@ export const authService = {
                 };
             }
 
-            // If online login succeeds and no MFA needed, cache the latest params for future offline use
             await cacheAuthParams(email, salt, wrapped_mek, loginData.auth_hash);
             localStorage.setItem("active_user", email);
             localStorage.removeItem("offline_token");
@@ -168,19 +209,9 @@ export const authService = {
             return { success: true, isOfflineMode: false };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
-             // If local decryption succeeded, but the network is completely down, log in Offline Mode
-             if (err.message === "Network Error" || err.message === "Failed to fetch" || !err.response) {
-                 // Offline Key Derivation Verification
-                 if (localPasswordHash && localPasswordHash === loginData.auth_hash) {
-                     localStorage.setItem("active_user", email);
-                     
-                     // Token Mocking: Set a mock offline token in Auth Context (localStorage)
-                     localStorage.setItem("offline_token", "mock-offline-token-" + Date.now());
-                     
-                     return { success: true, isOfflineMode: true };
-                 } else {
-                     throw new Error("Invalid offline master password signature.");
-                 }
+             if (isNetworkFailure(err)) {
+                 console.warn("[Auth] Axios failed after probe — race condition fallback");
+                 return offlineLogin();
              }
              throw err;
         }
@@ -209,12 +240,10 @@ export const authService = {
             console.error("Failed to lock vault:", err);
         }
 
-        // 4. Destroy local SQLite cache for complete Account Isolation
-        try {
-            await invoke("clear_local_auth_cache");
-        } catch (err) {
-            console.error("Failed to clear local SQLite caches:", err);
-        }
+        // 4. Preserve local SQLite cache for Offline Mode
+        // We DO NOT call clear_local_auth_cache() here anymore.
+        // The SQLite database stores encrypted records securely at rest. By preserving it,
+        // the user will be able to log in natively using their offline cache when they return.
     },
 
     /**
