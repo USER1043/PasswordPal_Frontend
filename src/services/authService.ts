@@ -272,8 +272,7 @@ export const authService = {
         });
 
         // Update server with new wrapped MEK and auth hash
-        await apiClient.post("/auth/register", {
-            email,
+        await apiClient.post("/auth/change-password", {
             salt,
             wrapped_mek: newWrappedMek,
             auth_hash: loginData.auth_hash,
