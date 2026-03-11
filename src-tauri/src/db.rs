@@ -64,7 +64,11 @@ pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
 
     // Check if device_id exists
     let mut count: i64 = 0;
-    if let Ok(c) = conn.query_row("SELECT count(*) FROM local_config WHERE key = 'device_id'", [], |r| r.get(0)) {
+    if let Ok(c) = conn.query_row(
+        "SELECT count(*) FROM local_config WHERE key = 'device_id'",
+        [],
+        |r| r.get(0),
+    ) {
         count = c;
     }
 
@@ -73,8 +77,14 @@ pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
         let os_name = std::env::consts::OS; // e.g., "linux"
         let username = whoami::username().unwrap_or_else(|_| "UnknownUser".to_string());
         let device_name = format!("{}/{}", os_name, username);
-        conn.execute("INSERT INTO local_config (key, value) VALUES ('device_id', ?1)", params![uuid_str])?;
-        conn.execute("INSERT INTO local_config (key, value) VALUES ('device_name', ?1)", params![device_name])?;
+        conn.execute(
+            "INSERT INTO local_config (key, value) VALUES ('device_id', ?1)",
+            params![uuid_str],
+        )?;
+        conn.execute(
+            "INSERT INTO local_config (key, value) VALUES ('device_name', ?1)",
+            params![device_name],
+        )?;
     }
 
     Ok(conn)
@@ -343,9 +353,24 @@ pub struct LocalIdentity {
 #[command]
 pub fn get_local_identity(state: State<'_, DbState>) -> Result<LocalIdentity, String> {
     let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
-    let device_id: String = conn.query_row("SELECT value FROM local_config WHERE key = 'device_id'", [], |r| r.get(0)).map_err(|e| e.to_string())?;
-    let device_name: String = conn.query_row("SELECT value FROM local_config WHERE key = 'device_name'", [], |r| r.get(0)).map_err(|e| e.to_string())?;
-    Ok(LocalIdentity { device_id, device_name })
+    let device_id: String = conn
+        .query_row(
+            "SELECT value FROM local_config WHERE key = 'device_id'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    let device_name: String = conn
+        .query_row(
+            "SELECT value FROM local_config WHERE key = 'device_name'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(LocalIdentity {
+        device_id,
+        device_name,
+    })
 }
 
 #[command]
