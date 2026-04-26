@@ -1,7 +1,7 @@
 // ============================================================================
 // src/components/UnlockScreen.tsx - Vault Unlock Overlay
 // ============================================================================
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 
 interface UnlockScreenProps {
@@ -15,6 +15,11 @@ export default function UnlockScreen({ onUnlock, onCancel }: UnlockScreenProps) 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
+    // Scrub password from memory on unmount (e.g., auto-lock dismissed or cancel)
+    useEffect(() => {
+        return () => setPassword("");
+    }, []);
+
     const handleUnlock = async () => {
         if (!password) {
             setError("Please enter your master password");
@@ -26,6 +31,8 @@ export default function UnlockScreen({ onUnlock, onCancel }: UnlockScreenProps) 
 
         try {
             await onUnlock(password);
+            // Immediately wipe the password from state after successful unlock
+            setPassword("");
         } catch {
             setError("Invalid password");
         } finally {

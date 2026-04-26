@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Shield, Eye, EyeOff, Loader2, Sparkles, KeyRound, User } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
-import { authService } from "../services/authService";
+import { authService, registerSensitiveStateCallback, unregisterSensitiveStateCallback } from "../services/authService";
 import * as totpService from "../services/totpService";
 import AppLogo from "../components/common/AppLogo";
 
@@ -77,6 +77,17 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Scrub password from memory on unmount (e.g., if user navigates away mid-flow)
+  // Also register with authService so logout() can wipe it remotely.
+  useEffect(() => {
+    const clearPassword = () => setPassword("");
+    registerSensitiveStateCallback(clearPassword);
+    return () => {
+      unregisterSensitiveStateCallback(clearPassword);
+      clearPassword();
+    };
+  }, []);
+
   const handleLogin = async () => {
     if (!email || !password) {
       notifyError("Please enter email and password");
@@ -96,6 +107,8 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         return;
       }
 
+      // Immediately wipe the password from React state before any navigation
+      setPassword("");
       // Save email to suggestions on successful login
       saveEmail(email);
       success("Welcome back! Your vault is unlocked.");
@@ -108,7 +121,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         notifyError("Email or password incorrect");
         return;
       }
-      
+
       if (err instanceof Error) {
         if (err.message.includes("No offline login data")) {
           notifyError("No connection to server, and no offline data exists for this email.");
@@ -129,6 +142,8 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         notifyError("Internal server error. Please try again later.");
       }
     } finally {
+      // Overwrite the local password variable on ALL exit paths (success, error, and MFA redirect)
+      setPassword("");
       setLoading(false);
     }
   };

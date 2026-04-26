@@ -131,11 +131,16 @@ function App() {
 
   // Handle vault unlock after auto-lock
   const handleUnlock = async (password: string) => {
-    // Re-derive keys and unlock vault via Rust
-    const { salt, wrapped_mek } = await authService.getParams(userEmail);
-    await invoke("login_vault", { password, salt, wrappedMek: wrapped_mek });
-    setIsLocked(false);
-    resetAutoLockTimer();
+    try {
+      // Re-derive keys and unlock vault via Rust
+      const { salt, wrapped_mek } = await authService.getParams(userEmail);
+      await invoke("login_vault", { password, salt, wrappedMek: wrapped_mek });
+      setIsLocked(false);
+      resetAutoLockTimer();
+    } finally {
+      // Overwrite the local password variable on ALL exit paths (success and error)
+      password = "";
+    }
   };
 
   // Handle logout from unlock screen
