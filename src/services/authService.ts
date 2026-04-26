@@ -18,6 +18,29 @@ function isNetworkFailure(err: any): boolean {
     );
 }
 
+// ============================================================================
+// Sensitive State Callback Registry
+// Components (LoginPage, SettingsPage, etc.) register their setPassword("")
+// callbacks here on mount and unregister on unmount. The logout() function
+// fires all of them to guarantee no plaintext password lingers in any
+// mounted component's React state after logout.
+// ============================================================================
+const sensitiveStateCallbacks = new Set<() => void>();
+
+export function registerSensitiveStateCallback(cb: () => void): void {
+    sensitiveStateCallbacks.add(cb);
+}
+
+export function unregisterSensitiveStateCallback(cb: () => void): void {
+    sensitiveStateCallbacks.delete(cb);
+}
+
+function clearAllSensitiveState(): void {
+    sensitiveStateCallbacks.forEach(cb => {
+        try { cb(); } catch { /* never let a component callback abort the logout */ }
+    });
+}
+
 async function cacheAuthParams(email: string, salt: string, wrapped_mek: string, auth_hash: string = "") {
     try {
         await invoke("cache_auth_params", {
@@ -155,6 +178,8 @@ export const authService = {
                 salt,
                 wrappedMek: wrapped_mek,
             });
+            // Overwrite the local password variable immediately after invoke resolves
+            masterPassword = "";
         } catch (err) {
             // ZERO-KNOWLEDGE AUDIT FIX
             // If local decryption fails but server is alive, intentionally hit the server to log the failure
@@ -232,6 +257,10 @@ export const authService = {
         localStorage.removeItem("offline_token");
         localStorage.removeItem("active_user");
         sessionStorage.clear();
+
+        // 2b. Fire all registered component-level sensitive state callbacks
+        // (e.g. setPassword("") in LoginPage, SettingsPage, etc.)
+        clearAllSensitiveState();
 
         // 3. Lock memory in Rust
         try {
