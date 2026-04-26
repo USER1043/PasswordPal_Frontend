@@ -78,7 +78,8 @@ pub fn register_vault(
     state: State<'_, Mutex<VaultState>>,
     password: String,
 ) -> Result<RegisterResponse, String> {
-    let (response, mek) = register_vault_logic(password)?;
+    let password = Zeroizing::new(password);
+    let (response, mek) = register_vault_logic(password.as_str().to_owned())?;
 
     // 6. Store MEK in State (Unlock the vault immediately)
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
@@ -142,7 +143,8 @@ pub fn login_vault(
     salt: String,
     wrapped_mek: String,
 ) -> Result<LoginResponse, String> {
-    let (response, mek_vec) = login_vault_logic(password, salt, wrapped_mek)?;
+    let password = Zeroizing::new(password);
+    let (response, mek_vec) = login_vault_logic(password.as_str().to_owned(), salt, wrapped_mek)?;
 
     // 4. Store MEK in State
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
@@ -225,7 +227,14 @@ pub fn change_password_optimization(
     new_password: String,
     salt: String,
 ) -> Result<String, String> {
-    change_password_optimization_logic(encrypted_mek_blob, old_password, new_password, salt)
+    let old_password = Zeroizing::new(old_password);
+    let new_password = Zeroizing::new(new_password);
+    change_password_optimization_logic(
+        encrypted_mek_blob,
+        old_password.as_str().to_owned(),
+        new_password.as_str().to_owned(),
+        salt,
+    )
 }
 
 #[derive(Serialize)]
@@ -291,11 +300,13 @@ pub fn recover_vault(
     recovery_key: String,
     new_password: String,
 ) -> Result<RecoverVaultResponse, String> {
-    let response = recover_vault_logic(recovery_key.clone(), new_password)?;
+    let recovery_key = Zeroizing::new(recovery_key);
+    let new_password = Zeroizing::new(new_password);
+    let response = recover_vault_logic(recovery_key.as_str().to_owned(), new_password.as_str().to_owned())?;
 
     // Decode recovery key → store MEK in state so vault is immediately unlocked
     let mek = general_purpose::STANDARD
-        .decode(&recovery_key)
+        .decode(recovery_key.as_str())
         .map_err(|_| "Invalid recovery key")?;
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
     let mut stored_mek = zeroize::Zeroizing::new([0u8; 32]);
