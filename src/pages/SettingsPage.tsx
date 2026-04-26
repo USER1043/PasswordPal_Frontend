@@ -1,7 +1,7 @@
 // ============================================================================
 // SettingsPage — Real 2FA, Password Change, Export, Delete Account
 // ============================================================================
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Settings, Shield, Lock, User, Monitor,
     ChevronRight, Loader2, AlertTriangle,
@@ -9,7 +9,7 @@ import {
     Check, X, Eye, EyeOff,
 } from "lucide-react";
 import DeviceManagement from "../components/DeviceManagement";
-import { authService } from "../services/authService";
+import { authService, registerSensitiveStateCallback, unregisterSensitiveStateCallback } from "../services/authService";
 import * as totpService from "../services/totpService";
 import { useNotification } from "../context/NotificationContext";
 import apiClient from "../api/axiosClient";
@@ -106,6 +106,41 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
     const [showOldPwd, setShowOldPwd] = useState(false);
     const [showNewPwd, setShowNewPwd] = useState(false);
     const [changePwdLoading, setChangePwdLoading] = useState(false);
+
+    // Ref to track whether a password change operation is in-flight.
+    // Kept in sync with changePwdLoading so the cleanup effect can read it
+    // without stale-closure issues.
+    const changePwdPendingRef = useRef(false);
+    const setChangePwdLoadingTracked = (pending: boolean) => {
+        changePwdPendingRef.current = pending;
+        setChangePwdLoading(pending);
+    };
+
+    // If the component unmounts while an operation is still pending, clear all
+    // password fields so plaintext values don't linger in abandoned React state.
+    useEffect(() => {
+        return () => {
+            if (changePwdPendingRef.current) {
+                setOldPassword("");
+                setNewPassword("");
+                setConfirmNewPassword("");
+            }
+        };
+    }, []);
+
+    // Register password fields with authService so logout() wipes them even if the form is open
+    useEffect(() => {
+        const clearPasswords = () => {
+            setOldPassword("");
+            setNewPassword("");
+            setConfirmNewPassword("");
+        };
+        registerSensitiveStateCallback(clearPasswords);
+        return () => {
+            unregisterSensitiveStateCallback(clearPasswords);
+            clearPasswords();
+        };
+    }, []);
 
     useEffect(() => {
         loadMfaStatus();
@@ -205,18 +240,18 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
             notifyError("New password must be at least 8 characters");
             return;
         }
-        setChangePwdLoading(true);
+        setChangePwdLoadingTracked(true);
         try {
             await authService.changePassword(userEmail, oldPassword, newPassword);
             success("Password changed successfully");
             setShowPasswordChange(false);
-            setOldPassword("");
-            setNewPassword("");
-            setConfirmNewPassword("");
         } catch {
             notifyError("Password change failed. Check your current password.");
         } finally {
-            setChangePwdLoading(false);
+            setOldPassword("");
+            setNewPassword("");
+            setConfirmNewPassword("");
+            setChangePwdLoadingTracked(false);
         }
     };
 

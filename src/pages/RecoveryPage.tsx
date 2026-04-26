@@ -1,7 +1,7 @@
 // ============================================================================
 // RecoveryPage — Account Recovery via Recovery Key (Zero-Knowledge)
 // ============================================================================
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Shield, Key, Eye, EyeOff, Loader2, AlertTriangle, Copy, CheckCircle } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
 import apiClient from "../api/axiosClient";
@@ -21,6 +21,14 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
     const [recoveredKey, setRecoveredKey] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const { success, error: notifyError } = useNotification();
+
+    // HIGH PRIORITY: Recovery key is raw encryption material — scrub from state on unmount
+    useEffect(() => {
+        return () => {
+            setRecoveryKey("");
+            setNewPassword("");
+        };
+    }, []);
 
     const handleCopy = async () => {
         if (!recoveredKey) return;
@@ -65,6 +73,10 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
                 new_wrapped_mek: recoverData.new_wrapped_mek,
                 new_auth_hash: recoverData.new_auth_hash,
             });
+
+            // HIGH PRIORITY: Wipe raw key material from React state immediately on success
+            setRecoveryKey("");
+            setNewPassword("");
 
             success("Account recovered!");
             setRecoveredKey(recoveryKey.trim());

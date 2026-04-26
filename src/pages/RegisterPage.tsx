@@ -1,5 +1,5 @@
 // Registration page - creates new user account with master password and recovery key
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Shield,
   Key,
@@ -30,6 +30,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryKey, setRecoveryKey] = useState("");
+
+  // Scrub passwords from memory on unmount (e.g., user navigates away mid-flow)
+  useEffect(() => {
+    return () => {
+      setMasterPassword("");
+      setConfirmPassword("");
+    };
+  }, []);
 
   const checkPasswordStrength = (password: string) => {
     let strength = 0;
@@ -77,6 +85,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       // Register device (mock for now, but good to keep flow)
       await registerDevice();
+
+      // Immediately wipe passwords from React state before showing the recovery modal
+      setMasterPassword("");
+      setConfirmPassword("");
 
       // Show recovery key modal
       setShowRecoveryModal(true);
