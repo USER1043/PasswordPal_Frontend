@@ -23,7 +23,7 @@ export default function AppLogo({ size = "md", showText = true }: AppLogoProps) 
     return (
         <div className="flex items-center gap-3">
             <img
-                src="/logo.jpg"
+                src="/logo.png"
                 alt="PasswordPal Logo"
                 className={`object-contain rounded-xl shadow-lg shadow-purple-500/20 ${imgClass}`}
             />
