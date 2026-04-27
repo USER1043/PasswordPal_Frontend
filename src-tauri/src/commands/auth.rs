@@ -302,7 +302,10 @@ pub fn recover_vault(
 ) -> Result<RecoverVaultResponse, String> {
     let recovery_key = Zeroizing::new(recovery_key);
     let new_password = Zeroizing::new(new_password);
-    let response = recover_vault_logic(recovery_key.as_str().to_owned(), new_password.as_str().to_owned())?;
+    let response = recover_vault_logic(
+        recovery_key.as_str().to_owned(),
+        new_password.as_str().to_owned(),
+    )?;
 
     // Decode recovery key → store MEK in state so vault is immediately unlocked
     let mek = general_purpose::STANDARD

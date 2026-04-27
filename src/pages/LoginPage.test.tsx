@@ -8,7 +8,9 @@ import { NotificationProvider } from '../context/NotificationContext';
 vi.mock('../services/authService', () => ({
   authService: {
     login: vi.fn()
-  }
+  },
+  registerSensitiveStateCallback: vi.fn(),
+  unregisterSensitiveStateCallback: vi.fn(),
 }));
 
 // Mock useNotification to prevent it trying to render actual toasts if we accidentally trigger one
