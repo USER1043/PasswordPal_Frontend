@@ -19,9 +19,9 @@ fn test_unlock_vault_success() {
 
     let result = unlock_vault_logic(&mut state, valid_key.to_string());
     assert!(result.is_ok());
-    assert!(state.unlocked);
-    assert!(state.enc_key.is_some());
-    assert_eq!(state.enc_key.unwrap().len(), 32);
+    assert!(state.is_unlocked());
+    assert!(state.key().is_some());
+    assert_eq!(state.key().unwrap().len(), 32);
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn test_unlock_vault_invalid_base64() {
     let result = unlock_vault_logic(&mut state, "!!!".to_string());
     assert!(result.is_err());
     assert_eq!(result.err().unwrap(), "Invalid base64 key");
-    assert!(!state.unlocked);
+    assert!(!state.is_unlocked());
 }
 
 #[test]
@@ -40,21 +40,19 @@ fn test_unlock_vault_wrong_length() {
     let result = unlock_vault_logic(&mut state, "AAAA".to_string());
     assert!(result.is_err());
     assert_eq!(result.err().unwrap(), "Key must be exactly 32 bytes");
-    assert!(!state.unlocked);
+    assert!(!state.is_unlocked());
 }
 
 #[test]
 fn test_lock_vault() {
     // Create a new vault state
-    let mut state = VaultState {
-        enc_key: Some(vec![0; 32]),
-        unlocked: true,
-    };
+    let mut state = VaultState::default();
+    state.unlock(vec![0; 32]);
 
     lock_vault_logic(&mut state);
     // Check if the vault is locked and the enc key is wiped
-    assert!(!state.unlocked);
-    assert!(state.enc_key.is_none());
+    assert!(!state.is_unlocked());
+    assert!(state.key().is_none());
 }
 
 #[test]
@@ -65,19 +63,19 @@ fn test_unlock_lock_cycle() {
     // Unlock
     let result = unlock_vault_logic(&mut state, key.clone());
     assert!(result.is_ok());
-    assert!(state.unlocked);
-    assert!(state.enc_key.is_some());
+    assert!(state.is_unlocked());
+    assert!(state.key().is_some());
 
     // Lock
     lock_vault_logic(&mut state);
-    assert!(!state.unlocked);
-    assert!(state.enc_key.is_none());
+    assert!(!state.is_unlocked());
+    assert!(state.key().is_none());
 
     // Unlock again
     let result2 = unlock_vault_logic(&mut state, key);
     assert!(result2.is_ok());
-    assert!(state.unlocked);
-    assert!(state.enc_key.is_some());
+    assert!(state.is_unlocked());
+    assert!(state.key().is_some());
 }
 
 #[test]
@@ -87,7 +85,7 @@ fn test_unlock_while_already_unlocked() {
 
     // First unlock
     unlock_vault_logic(&mut state, key1).unwrap();
-    assert!(state.unlocked);
+    assert!(state.is_unlocked());
 
     // Create a different key
     let key2_bytes = vec![0xFFu8; 32];
@@ -96,8 +94,8 @@ fn test_unlock_while_already_unlocked() {
     // Unlock again with different key - should replace the old key
     let result = unlock_vault_logic(&mut state, key2);
     assert!(result.is_ok());
-    assert!(state.unlocked);
-    assert_eq!(state.enc_key.unwrap(), key2_bytes);
+    assert!(state.is_unlocked());
+    assert_eq!(state.key().unwrap(), key2_bytes);
 }
 
 #[test]
@@ -106,8 +104,8 @@ fn test_lock_already_locked_vault() {
 
     // Lock an already locked vault - should not panic
     lock_vault_logic(&mut state);
-    assert!(!state.unlocked);
-    assert!(state.enc_key.is_none());
+    assert!(!state.is_unlocked());
+    assert!(state.key().is_none());
 }
 
 #[test]
@@ -152,7 +150,7 @@ fn test_unlock_with_all_different_byte_values() {
         let key = general_purpose::STANDARD.encode(&pattern);
         let result = unlock_vault_logic(&mut state, key);
         assert!(result.is_ok());
-        assert_eq!(state.enc_key.as_ref().unwrap(), &pattern);
+        assert_eq!(state.key().unwrap(), &pattern);
         lock_vault_logic(&mut state); // Reset for next iteration
     }
 }
@@ -166,12 +164,12 @@ fn test_state_after_failed_unlock() {
     assert!(result.is_err());
 
     // State should remain locked
-    assert!(!state.unlocked);
-    assert!(state.enc_key.is_none());
+    assert!(!state.is_unlocked());
+    assert!(state.key().is_none());
 
     // Should be able to unlock with valid key after failed attempt
     let valid_key = get_test_key_b64();
     let result2 = unlock_vault_logic(&mut state, valid_key);
     assert!(result2.is_ok());
-    assert!(state.unlocked);
+    assert!(state.is_unlocked());
 }

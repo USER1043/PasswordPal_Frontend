@@ -83,10 +83,7 @@ pub fn register_vault(
 
     // 6. Store MEK in State (Unlock the vault immediately)
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
-    let mut stored_mek = Zeroizing::new([0u8; 32]);
-    stored_mek.copy_from_slice(&mek);
-    st.enc_key = Some(stored_mek.to_vec());
-    st.unlocked = true;
+    st.unlock(mek);
 
     Ok(response)
 }
@@ -148,10 +145,7 @@ pub fn login_vault(
 
     // 4. Store MEK in State
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
-    let mut stored_mek = Zeroizing::new([0u8; 32]);
-    stored_mek.copy_from_slice(&mek_vec);
-    st.enc_key = Some(stored_mek.to_vec());
-    st.unlocked = true;
+    st.unlock(mek_vec);
 
     Ok(response)
 }
@@ -312,10 +306,7 @@ pub fn recover_vault(
         .decode(recovery_key.as_str())
         .map_err(|_| "Invalid recovery key")?;
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
-    let mut stored_mek = zeroize::Zeroizing::new([0u8; 32]);
-    stored_mek.copy_from_slice(&mek);
-    st.enc_key = Some(stored_mek.to_vec());
-    st.unlocked = true;
+    st.unlock(mek);
 
     Ok(response)
 }

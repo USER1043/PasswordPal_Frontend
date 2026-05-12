@@ -24,10 +24,9 @@ pub fn unlock_vault_logic(st: &mut VaultState, key_b64: String) -> Result<(), St
     }
 
     // If already unlocked, wipe the old key first
-    st.lock_and_wipe();
+    st.lock();
 
-    st.enc_key = Some(key_bytes);
-    st.unlocked = true;
+    st.unlock(key_bytes);
 
     Ok(())
 }
@@ -43,5 +42,5 @@ pub fn lock_vault(state: State<'_, Mutex<VaultState>>) -> Result<(), String> {
 /// Core logic for locking the vault.
 /// Separated for unit testing.
 pub fn lock_vault_logic(st: &mut VaultState) {
-    st.lock_and_wipe();
+    st.lock();
 }

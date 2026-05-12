@@ -1,16 +1,25 @@
-use zeroize::Zeroize;
+use zeroize::Zeroizing;
 
 /// Manages the vault's runtime state, securely holding the encryption key when unlocked.
 #[derive(Default)]
 pub struct VaultState {
-    pub unlocked: bool,
-    pub enc_key: Option<Vec<u8>>,
+    enc_key: Option<Zeroizing<Vec<u8>>>,
 }
 impl VaultState {
-    pub fn lock_and_wipe(&mut self) {
-        if let Some(mut k) = self.enc_key.take() {
-            k.zeroize();
-        }
-        self.unlocked = false;
+    pub fn unlock(&mut self, key: Vec<u8>) {
+        self.enc_key = Some(Zeroizing::new(key));
     }
+
+    pub fn lock(&mut self) {
+        self.enc_key = None;
+    }
+    
+    pub fn key(&self) -> Option<&[u8]> {
+        self.enc_key.as_deref().map(|k| k.as_slice())
+    }
+    
+    pub fn is_unlocked(&self) -> bool {
+        self.enc_key.is_some()
+    }
+    
 }
