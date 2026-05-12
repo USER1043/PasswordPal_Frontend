@@ -19,11 +19,11 @@ pub fn encrypt_entry(
 }
 
 pub fn encrypt_entry_logic(st: &VaultState, entry: &VaultEntry) -> Result<String, String> {
-    if !st.unlocked {
+    if !st.is_unlocked() {
         return Err("Vault is locked".into());
     }
     // Verify that the key exists.
-    let key_bytes = st.enc_key.as_ref().ok_or("Invalid base64 key")?;
+    let key_bytes = st.key().ok_or("Invalid base64 key")?;
 
     if key_bytes.len() != 32 {
         return Err("Key must be 32 bytes for encryption".into());
@@ -68,11 +68,11 @@ pub fn decrypt_entry(
 }
 
 pub fn decrypt_entry_logic(st: &VaultState, blob_b64: &str) -> Result<VaultEntry, String> {
-    if !st.unlocked {
+    if !st.is_unlocked() {
         return Err("Vault is locked".into());
     }
 
-    let key_bytes = st.enc_key.as_ref().ok_or("Invalid base64 key")?;
+    let key_bytes = st.key().ok_or("Invalid base64 key")?;
 
     if key_bytes.len() != 32 {
         return Err("Key length must be 32 bytes".into());

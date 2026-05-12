@@ -22,10 +22,8 @@ fn test_entry(folder: &str, url: &str, tags: Vec<&str>, pwd: &str) -> VaultEntry
 
 #[test]
 fn test_encrypt_decrypt_flow() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = test_entry("Test", "example.com", vec!["tag1"], "secret");
 
@@ -56,10 +54,8 @@ fn test_encrypt_fail_when_locked() {
 
 #[test]
 fn test_decrypt_fail_tampered_data() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = test_entry("Test", "example.com", vec![], "secret");
     let blob = encrypt_entry_logic(&state, &entry).unwrap();
@@ -74,16 +70,13 @@ fn test_decrypt_fail_tampered_data() {
 
 #[test]
 fn test_decrypt_fail_when_locked() {
-    let mut state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = test_entry("Test", "example.com", vec![], "secret");
     let blob = encrypt_entry_logic(&state, &entry).unwrap();
 
-    state.unlocked = false;
-    state.enc_key = None;
+    state.lock();
 
     let result = decrypt_entry_logic(&state, &blob);
     assert!(result.is_err());
@@ -92,10 +85,8 @@ fn test_decrypt_fail_when_locked() {
 
 #[test]
 fn test_encrypt_entry_with_unicode_characters() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = VaultEntry {
         name: "日本語アカウント".into(),
@@ -120,10 +111,8 @@ fn test_encrypt_entry_with_unicode_characters() {
 
 #[test]
 fn test_encrypt_entry_with_special_characters() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = VaultEntry {
         name: "Special!@#".into(),
@@ -144,10 +133,8 @@ fn test_encrypt_entry_with_special_characters() {
 
 #[test]
 fn test_encrypt_entry_with_empty_fields() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = VaultEntry {
         name: "".into(),
@@ -168,10 +155,8 @@ fn test_encrypt_entry_with_empty_fields() {
 
 #[test]
 fn test_encrypt_large_entry() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let large_password = "a".repeat(10000);
     let many_tags: Vec<String> = (0..100).map(|i| format!("tag{}", i)).collect();
@@ -197,10 +182,8 @@ fn test_encrypt_large_entry() {
 
 #[test]
 fn test_encrypt_multiple_entries_sequentially() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entries = vec![
         test_entry("Entry1", "site1.com", vec!["tag1"], "pass1"),
@@ -224,15 +207,13 @@ fn test_encrypt_multiple_entries_sequentially() {
 
 #[test]
 fn test_decrypt_with_wrong_key() {
-    let mut state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let entry = test_entry("Test", "example.com", vec![], "secret");
     let encrypted = encrypt_entry_logic(&state, &entry).unwrap();
 
-    state.enc_key = Some(vec![0xFFu8; 32]);
+    state.unlock(vec![0xFFu8; 32]);
 
     let result = decrypt_entry_logic(&state, &encrypted);
     assert!(result.is_err());
@@ -241,10 +222,8 @@ fn test_decrypt_with_wrong_key() {
 
 #[test]
 fn test_decrypt_invalid_base64() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let result = decrypt_entry_logic(&state, "!!!invalid_base64!!!");
     assert!(result.is_err());
@@ -253,10 +232,8 @@ fn test_decrypt_invalid_base64() {
 
 #[test]
 fn test_decrypt_blob_too_short() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     use base64::{engine::general_purpose, Engine as _};
     let short_blob = general_purpose::STANDARD.encode(b"short");
@@ -268,10 +245,8 @@ fn test_decrypt_blob_too_short() {
 
 #[test]
 fn test_encrypt_entry_with_very_long_url() {
-    let state = VaultState {
-        unlocked: true,
-        enc_key: Some(get_test_key()),
-    };
+    let mut state = VaultState::default();
+    state.unlock(get_test_key());
 
     let long_url = format!("https://example.com/{}", "a".repeat(5000));
 
