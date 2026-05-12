@@ -13,13 +13,12 @@ impl VaultState {
     pub fn lock(&mut self) {
         self.enc_key = None;
     }
-    
+
     pub fn key(&self) -> Option<&[u8]> {
         self.enc_key.as_deref().map(|k| k.as_slice())
     }
-    
+
     pub fn is_unlocked(&self) -> bool {
         self.enc_key.is_some()
     }
-    
 }
