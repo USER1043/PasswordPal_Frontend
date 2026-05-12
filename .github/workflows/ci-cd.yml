@@ -36,24 +36,22 @@ jobs:
           echo "Commit message: $COMMIT_MSG"
           echo "commit-message=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
 
-          # Check for conventional commit patterns (with optional scope support)
-          if [[ "$COMMIT_MSG" =~ ^feat!?:? ]]; then
+          # Regex patterns stored in variables — required for parentheses in bash [[ =~ ]]
+          # Optional scope group (\([^)]*\))? unifies scoped + unscoped variants in one pattern
+          FEAT_BREAKING_RE='^feat!(\([^)]*\))?:'   # major: feat!: or feat!(scope):
+          FEAT_RE='^feat(\([^)]*\))?:'              # minor: feat:  or feat(scope):
+          FIX_RE='^fix(\([^)]*\))?:'               # patch: fix:   or fix(scope):
+
+          # Check for conventional commit patterns
+          if [[ "$COMMIT_MSG" =~ $FEAT_BREAKING_RE ]]; then
             echo "should-version=true" >> "$GITHUB_OUTPUT"
             echo "version-type=major" >> "$GITHUB_OUTPUT"
             echo " Major version triggered by feat! commit"
-          elif [[ "$COMMIT_MSG" =~ ^feat\([^)]*\): ]]; then
-            echo "should-version=true" >> "$GITHUB_OUTPUT"
-            echo "version-type=minor" >> "$GITHUB_OUTPUT"
-            echo " Minor version triggered by feat: commit with scope"
-          elif [[ "$COMMIT_MSG" =~ ^feat: ]]; then
+          elif [[ "$COMMIT_MSG" =~ $FEAT_RE ]]; then
             echo "should-version=true" >> "$GITHUB_OUTPUT"
             echo "version-type=minor" >> "$GITHUB_OUTPUT"
             echo " Minor version triggered by feat: commit"
-          elif [[ "$COMMIT_MSG" =~ ^fix\([^)]*\): ]]; then
-            echo "should-version=true" >> "$GITHUB_OUTPUT"
-            echo "version-type=patch" >> "$GITHUB_OUTPUT"
-            echo " Patch version triggered by fix: commit with scope"
-          elif [[ "$COMMIT_MSG" =~ ^fix: ]]; then
+          elif [[ "$COMMIT_MSG" =~ $FIX_RE ]]; then
             echo "should-version=true" >> "$GITHUB_OUTPUT"
             echo "version-type=patch" >> "$GITHUB_OUTPUT"
             echo " Patch version triggered by fix: commit"
