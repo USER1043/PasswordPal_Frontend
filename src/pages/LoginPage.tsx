@@ -1,5 +1,5 @@
 // ============================================================================
-// LoginPage — Zero-Knowledge Login with MFA Challenge Support
+// LoginPage - Zero-Knowledge Login with MFA Challenge Support
 // Includes: localStorage-based email suggestions (Tauri WebView has no native
 // browser credential manager, so we implement our own suggestion dropdown)
 // ============================================================================
@@ -162,7 +162,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         await totpService.verifyLogin(mfaCode);
       }
 
-      // MFA complete — save email and navigate to vault
+      // MFA complete - save email and navigate to vault
       saveEmail(email);
       success("Welcome back! Your vault is unlocked.");
       onLoginSuccess?.(email);

@@ -1,5 +1,5 @@
 // ============================================================================
-// SettingsPage — Real 2FA, Password Change, Export, Delete Account
+// SettingsPage - Real 2FA, Password Change, Export, Delete Account
 // ============================================================================
 import { useState, useEffect, useRef } from "react";
 import {
@@ -84,7 +84,7 @@ export default function SettingsPage({ onNavigate, userEmail = "" }: SettingsPag
 }
 
 // ============================================================================
-// Security Tab — 2FA and Password Change
+// Security Tab - 2FA and Password Change
 // ============================================================================
 function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: string) => void; success: (msg: string) => void; userEmail: string }) {
     // 2FA State
@@ -152,7 +152,7 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
             const status = await totpService.getStatus();
             setMfaEnabled(status.enabled);
         } catch {
-            // MFA status check failed — assume disabled
+            // MFA status check failed - assume disabled
         } finally {
             setMfaLoading(false);
         }
@@ -455,7 +455,7 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
 }
 
 // ============================================================================
-// Account Tab — Export, Delete Account
+// Account Tab - Export, Delete Account
 // ============================================================================
 function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: string) => void; notifyError: (msg: string) => void; success: (msg: string) => void }) {
     const [exportLoading, setExportLoading] = useState(false);

@@ -1,5 +1,5 @@
 // ============================================================================
-// VaultPage — Real encrypted vault data from backend via Rust decryption
+// VaultPage - Real encrypted vault data from backend via Rust decryption
 // ============================================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -125,7 +125,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     } catch (err: unknown) {
       console.error("Save failed:", err);
       if ((err as { response?: { status?: number } }).response?.status === 409) {
-        notifyError("Version conflict — someone else modified this entry. Please refresh.");
+        notifyError("Version conflict - someone else modified this entry. Please refresh.");
       } else {
         notifyError("Failed to save password");
       }

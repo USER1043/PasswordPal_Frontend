@@ -1,5 +1,5 @@
 // ============================================================================
-// Device Management Service — Real API calls to backend
+// Device Management Service - Real API calls to backend
 // ============================================================================
 import apiClient from "../api/axiosClient";
 

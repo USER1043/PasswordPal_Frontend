@@ -287,7 +287,7 @@ pub fn recover_vault_logic(
 }
 
 /// Recovers a vault using the recovery key (raw MEK base64) and a new master password.
-/// Re-wraps the existing MEK under the new password — vault data is preserved.
+/// Re-wraps the existing MEK under the new password - vault data is preserved.
 #[tauri::command]
 pub fn recover_vault(
     state: State<'_, Mutex<VaultState>>,

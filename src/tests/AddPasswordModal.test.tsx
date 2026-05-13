@@ -240,7 +240,7 @@ describe('AddPasswordModal Component', () => {
         const saveButton = screen.getByText('Save');
         fireEvent.click(saveButton);
 
-        // handleSubmit is async (awaits breach check) — must waitFor the callback
+        // handleSubmit is async (awaits breach check) - must waitFor the callback
         await waitFor(() => {
             expect(mockOnSave).toHaveBeenCalledWith(
                 expect.objectContaining({

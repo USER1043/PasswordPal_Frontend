@@ -40,13 +40,12 @@ jobs:
       - name: Run React unit tests (vitest + jsdom)
         run: npm test -- --run
         env:
-          # Tauri APIs are not available in jsdom — point to real backend for integration
-          VITE_BACKEND_URL: http://localhost:3000
+          VITE_BACKEND_URL: http://localhost:3000 # Just to satisfy the env check while testing
 
       - name: Build web assets (Vite)
         run: npm run build
         env:
-          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL || 'https://passwordpal-backend.onrender.com' }}
+          VITE_BACKEND_URL: https://passwordpal-backend.onrender.com
 
       - name: Upload web dist artifact
         uses: actions/upload-artifact@v4
@@ -115,6 +114,7 @@ jobs:
     outputs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
+      release-id: ${{ steps.release.outputs.id }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -128,7 +128,7 @@ jobs:
   # Builds for all 3 platforms in parallel.
   # ──────────────────────────────────────────
   build-tauri:
-    name: Build Tauri — ${{ matrix.platform }}
+    name: Build Tauri - ${{ matrix.platform }}
     needs: [test-react, test-rust, release-please]
     if: |
       github.ref == 'refs/heads/main' &&
@@ -149,6 +149,8 @@ jobs:
             artifact_name: passwordpal-macos
 
     runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write  # required to upload assets to the GitHub Release
 
     steps:
       - name: Checkout repository
@@ -190,11 +192,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL || 'https://passwordpal-backend.onrender.com' }}
+          VITE_BACKEND_URL: https://passwordpal-backend.onrender.com
         with:
-          tagName: ${{ needs.release-please.outputs.tag-name }}
-          releaseName: "PasswordPal ${{ needs.release-please.outputs.tag-name }}"
-          releaseId: "" # release-please already created it; tauri-action uploads assets to it
+          # Use the numeric release ID from release-please so tauri-action uploads
+          # assets to the existing release instead of trying to create a duplicate
+          releaseId: ${{ needs.release-please.outputs.release-id }}
 
       - name: Upload platform bundles
         uses: actions/upload-artifact@v4

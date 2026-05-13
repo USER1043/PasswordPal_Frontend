@@ -1,5 +1,5 @@
 // ============================================================================
-// Sync Service — Delta sync pull/push via backend /api/vault/sync endpoints
+// Sync Service - Delta sync pull/push via backend /api/vault/sync endpoints
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";

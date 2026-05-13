@@ -1,5 +1,5 @@
 // ============================================================================
-// AppLogo — Reusable PasswordPal branding component
+// AppLogo - Reusable PasswordPal branding component
 // ============================================================================
 
 interface AppLogoProps {
