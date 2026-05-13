@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.2.0...passwordpal-v0.2.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* give the required permission for the github action to upload the built binaries and update the release search to use releaseId instead of tagName ([42d83ef](https://github.com/USER1043/PasswordPal_Frontend/commit/42d83ef822782a9f6aa967d63c0b11717c20ee85))
+* give the required permission for the github action to upload the… ([15c64e8](https://github.com/USER1043/PasswordPal_Frontend/commit/15c64e8d4e2153b29731daf816fdf48650c22113))
+
 ## [0.2.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.1.45...passwordpal-v0.2.0) (2026-05-13)
 
 
