@@ -1,5 +1,5 @@
 // ============================================================================
-// RecoveryPage — Account Recovery via Recovery Key (Zero-Knowledge)
+// RecoveryPage - Account Recovery via Recovery Key (Zero-Knowledge)
 // ============================================================================
 import { useState, useEffect } from "react";
 import { Shield, Key, Eye, EyeOff, Loader2, AlertTriangle, Copy, CheckCircle } from "lucide-react";
@@ -22,7 +22,7 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
     const [copied, setCopied] = useState(false);
     const { success, error: notifyError } = useNotification();
 
-    // HIGH PRIORITY: Recovery key is raw encryption material — scrub from state on unmount
+    // HIGH PRIORITY: Recovery key is raw encryption material - scrub from state on unmount
     useEffect(() => {
         return () => {
             setRecoveryKey("");
@@ -54,7 +54,7 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
         setLoading(true);
         try {
             // Re-wrap the existing MEK from the recovery key under the new password.
-            // This preserves the vault — no new MEK is generated.
+            // This preserves the vault - no new MEK is generated.
             const recoverData = await invoke<{
                 new_salt: string;
                 new_wrapped_mek: string;
@@ -86,7 +86,7 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
             if (status === 404) {
                 notifyError("Account not found or no recovery key on file");
             } else if (status === 401) {
-                notifyError("Invalid recovery key — please check and try again");
+                notifyError("Invalid recovery key - please check and try again");
             } else {
                 const detail = (err as { response?: { data?: { error?: string } } }).response?.data?.error;
                 notifyError(detail || "Recovery failed. Please check your recovery key.");
@@ -107,7 +107,7 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-2">Account Recovered!</h2>
                         <p className="text-slate-400 text-sm mb-6">
-                            Your master password has been reset. Your recovery key is <strong className="text-white">unchanged</strong> — make sure you still have it saved securely.
+                            Your master password has been reset. Your recovery key is <strong className="text-white">unchanged</strong> - make sure you still have it saved securely.
                         </p>
 
                         <div className="bg-slate-950/60 border border-yellow-500/30 rounded-xl p-4 mb-4 text-left">

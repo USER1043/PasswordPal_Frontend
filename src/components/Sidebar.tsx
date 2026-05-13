@@ -1,5 +1,5 @@
 // ============================================================================
-// Sidebar — Main navigation with real logout via backend + Rust
+// Sidebar - Main navigation with real logout via backend + Rust
 // ============================================================================
 import {
     Lock, Zap, Shield, Settings, LogOut, Plus, History

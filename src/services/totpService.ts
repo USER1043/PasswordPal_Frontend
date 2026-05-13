@@ -1,5 +1,5 @@
 // ============================================================================
-// TOTP Service — MFA operations via backend /auth/totp/* endpoints
+// TOTP Service - MFA operations via backend /auth/totp/* endpoints
 // ============================================================================
 import apiClient from "../api/axiosClient";
 
@@ -19,7 +19,7 @@ export interface BackupCodesResponse {
 }
 
 /**
- * Initiate TOTP setup — returns secret + QR code for scanning.
+ * Initiate TOTP setup - returns secret + QR code for scanning.
  */
 export async function setupTotp(): Promise<TotpSetupResponse> {
     const response = await apiClient.post("/auth/totp/setup");

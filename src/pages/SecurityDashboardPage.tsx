@@ -1,5 +1,5 @@
 // ============================================================================
-// SecurityDashboardPage — Real vault analysis (strength, reuse, age, breach)
+// SecurityDashboardPage - Real vault analysis (strength, reuse, age, breach)
 // ============================================================================
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -167,11 +167,11 @@ export default function SecurityDashboardPage({ onNavigate }: SecurityDashboardP
 
         const newlyBreached = updated.filter((a) => a.breached).length;
         if (failCount > 0) {
-            notifyWarning(`Breach check completed — ${failCount} password(s) could not be checked (network error).`);
+            notifyWarning(`Breach check completed - ${failCount} password(s) could not be checked (network error).`);
         } else if (newlyBreached > 0) {
-            notifyError(`Breach check complete — ${newlyBreached} password(s) found in known data breaches!`);
+            notifyError(`Breach check complete - ${newlyBreached} password(s) found in known data breaches!`);
         } else {
-            notifySuccess("Breach check complete — none of your passwords were found in known data breaches.");
+            notifySuccess("Breach check complete - none of your passwords were found in known data breaches.");
         }
     };
 

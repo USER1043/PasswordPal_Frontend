@@ -1,5 +1,5 @@
 // ============================================================================
-// App.tsx — Main application with session management and auto-lock
+// App.tsx - Main application with session management and auto-lock
 // ============================================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -51,7 +51,7 @@ function App() {
       } else {
         if (wasOffline) {
           wasOffline = false;
-          console.log("[Sync] Reconnected — triggering offline vault sync");
+          console.log("[Sync] Reconnected - triggering offline vault sync");
           // The critical fix: By invoking syncOfflineVault() FIRST, it synchronously emits 
           // the 'sync-start' event before we emit 'network-status'. This allows React to 
           // seamlessly batch the state transitions and completely eliminates the "Cloud Synced" flicker.

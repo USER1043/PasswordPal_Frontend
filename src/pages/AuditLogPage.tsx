@@ -1,5 +1,5 @@
 // ============================================================================
-// AuditLogPage — Login History & Security Events
+// AuditLogPage - Login History & Security Events
 // ============================================================================
 import { useState, useEffect } from "react";
 import {

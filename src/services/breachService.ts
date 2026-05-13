@@ -1,5 +1,5 @@
 // ============================================================================
-// Breach Service — HIBP k-Anonymity password check via backend proxy
+// Breach Service - HIBP k-Anonymity password check via backend proxy
 // ============================================================================
 import apiClient from "../api/axiosClient";
 

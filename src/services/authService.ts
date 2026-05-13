@@ -1,5 +1,5 @@
 // ============================================================================
-// Auth Service — Zero-Knowledge Authentication via Rust + Backend
+// Auth Service - Zero-Knowledge Authentication via Rust + Backend
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
@@ -84,7 +84,7 @@ interface ApiResponse<T = Record<string, unknown>> {
 
 export const authService = {
     /**
-     * Register a new user — keys generated in Rust (Zero Knowledge)
+     * Register a new user - keys generated in Rust (Zero Knowledge)
      */
     async register(email: string, masterPassword: string): Promise<string> {
         const verifyKeys = await invoke<RegisterResponse>("register_vault", {
@@ -134,7 +134,7 @@ export const authService = {
         const online = await isServerReachable();
 
         if (!online) {
-            console.warn("[Auth] Probe failed — entering offline mode for getParams");
+            console.warn("[Auth] Probe failed - entering offline mode for getParams");
             return getOfflineParams();
         }
 
@@ -144,10 +144,10 @@ export const authService = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             if (isNetworkFailure(err)) {
-                console.warn("[Auth] Axios failed after probe — race condition fallback");
+                console.warn("[Auth] Axios failed after probe - race condition fallback");
                 return getOfflineParams();
             }
-            throw err; // 401, 404, 500 etc — real server error, bubble it up
+            throw err; // 401, 404, 500 etc - real server error, bubble it up
         }
     },
 
@@ -207,7 +207,7 @@ export const authService = {
         const online = await isServerReachable();
 
         if (!online) {
-            console.warn("[Auth] Probe failed — entering offline mode for login");
+            console.warn("[Auth] Probe failed - entering offline mode for login");
             return offlineLogin();
         }
 
@@ -235,7 +235,7 @@ export const authService = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
              if (isNetworkFailure(err)) {
-                 console.warn("[Auth] Axios failed after probe — race condition fallback");
+                 console.warn("[Auth] Axios failed after probe - race condition fallback");
                  return offlineLogin();
              }
              throw err;
@@ -243,7 +243,7 @@ export const authService = {
     },
 
     /**
-     * Logout — Scorched Earth: clear backend session + lock Rust vault + clear local SQLite DB
+     * Logout - Scorched Earth: clear backend session + lock Rust vault + clear local SQLite DB
      */
     async logout(): Promise<void> {
         // 1. Explicitly clear backend HttpOnly cookies first
@@ -306,7 +306,7 @@ export const authService = {
     },
 
     /**
-     * Change master password — re-wraps MEK with new password via Rust
+     * Change master password - re-wraps MEK with new password via Rust
      */
     async changePassword(
         email: string,
