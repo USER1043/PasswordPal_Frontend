@@ -1,6 +1,6 @@
 [package]
 name = "passwordpal"
-version = "0.1.45"
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["prajan"]
 edition = "2021"
