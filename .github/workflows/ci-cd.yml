@@ -12,56 +12,6 @@ env:
 
 jobs:
   # ──────────────────────────────────────────
-  # JOB 0: Check for conventional commits
-  # ──────────────────────────────────────────
-  check-conventional-commits:
-    name: Check Conventional Commits
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    outputs:
-      should-version: ${{ steps.check.outputs.should-version }}
-      version-type: ${{ steps.check.outputs.version-type }}
-      commit-message: ${{ steps.check.outputs.commit-message }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Get full history for commit messages
-
-      - name: Check for conventional commits
-        id: check
-        run: |
-          # Get the latest commit message
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          echo "Commit message: $COMMIT_MSG"
-          echo "commit-message=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
-
-          # Regex patterns stored in variables — required for parentheses in bash [[ =~ ]]
-          # Optional scope group (\([^)]*\))? unifies scoped + unscoped variants in one pattern
-          FEAT_BREAKING_RE='^feat!(\([^)]*\))?:'   # major: feat!: or feat!(scope):
-          FEAT_RE='^feat(\([^)]*\))?:'              # minor: feat:  or feat(scope):
-          FIX_RE='^fix(\([^)]*\))?:'               # patch: fix:   or fix(scope):
-
-          # Check for conventional commit patterns
-          if [[ "$COMMIT_MSG" =~ $FEAT_BREAKING_RE ]]; then
-            echo "should-version=true" >> "$GITHUB_OUTPUT"
-            echo "version-type=major" >> "$GITHUB_OUTPUT"
-            echo " Major version triggered by feat! commit"
-          elif [[ "$COMMIT_MSG" =~ $FEAT_RE ]]; then
-            echo "should-version=true" >> "$GITHUB_OUTPUT"
-            echo "version-type=minor" >> "$GITHUB_OUTPUT"
-            echo " Minor version triggered by feat: commit"
-          elif [[ "$COMMIT_MSG" =~ $FIX_RE ]]; then
-            echo "should-version=true" >> "$GITHUB_OUTPUT"
-            echo "version-type=patch" >> "$GITHUB_OUTPUT"
-            echo " Patch version triggered by fix: commit"
-          else
-            echo "should-version=false" >> "$GITHUB_OUTPUT"
-            echo "version-type=none" >> "$GITHUB_OUTPUT"
-            echo " No conventional commit found (fix:, feat:, feat!) - skipping version creation"
-          fi
-
-  # ──────────────────────────────────────────
   # JOB 1: React / TypeScript Tests & Lint
   # ──────────────────────────────────────────
   test-react:
@@ -150,15 +100,40 @@ jobs:
         run: cargo test --all
 
   # ──────────────────────────────────────────
-  # JOB 3: Build Tauri Desktop Binaries
-  # Runs on main branch only (expensive build)
-  # Builds for all 3 platforms in parallel
-  # Only creates versions when explicitly triggered
+  # JOB 3: Release Please
+  # Scans commits since last release tag and
+  # opens/updates a Release PR automatically.
+  # Merging that PR creates the GitHub Release.
+  # ──────────────────────────────────────────
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release-created: ${{ steps.release.outputs.release_created }}
+      tag-name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ──────────────────────────────────────────
+  # JOB 4: Build Tauri Desktop Binaries
+  # Runs only when release-please creates a
+  # release (i.e. the Release PR was merged).
+  # Builds for all 3 platforms in parallel.
   # ──────────────────────────────────────────
   build-tauri:
     name: Build Tauri — ${{ matrix.platform }}
-    needs: [test-react, test-rust, check-conventional-commits]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.check-conventional-commits.outputs.should-version == 'true'
+    needs: [test-react, test-rust, release-please]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      needs.release-please.outputs.release-created == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -206,54 +181,6 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Set App Version
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const versionType = '${{ needs.check-conventional-commits.outputs.version-type }}';
-
-            // Get current version from package.json
-            const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
-            const currentVersion = pkg.version || '0.1.0';
-            const [major, minor, patch] = currentVersion.split('.').map(Number);
-
-            // Calculate new version based on type
-            let newVersion;
-            switch (versionType) {
-              case 'major':
-                newVersion = `${major + 1}.0.0`;
-                break;
-              case 'minor':
-                newVersion = `${major}.${minor + 1}.0`;
-                break;
-              case 'patch':
-              default:
-                newVersion = `${major}.${minor}.${patch + 1}`;
-                break;
-            }
-
-            console.log(`Version type: ${versionType}`);
-            console.log(`Current version: ${currentVersion}`);
-            console.log(`New version: ${newVersion}`);
-
-            // Update package.json
-            pkg.version = newVersion;
-            fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
-
-            // Update tauri.conf.json
-            const tauri = JSON.parse(fs.readFileSync('./src-tauri/tauri.conf.json', 'utf8'));
-            tauri.version = newVersion;
-            fs.writeFileSync('./src-tauri/tauri.conf.json', JSON.stringify(tauri, null, 2));
-
-            // Update Cargo.toml
-            let cargo = fs.readFileSync('./src-tauri/Cargo.toml', 'utf8');
-            cargo = cargo.replace(/^version\s*=\s*".*"/m, `version = "${newVersion}"`);
-            fs.writeFileSync('./src-tauri/Cargo.toml', cargo);
-
-            // Set output for later use
-            console.log(`::set-output name=version::${newVersion}`);
-
       - name: Install Node dependencies
         run: npm ci
 
@@ -265,8 +192,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL || 'https://passwordpal-backend.onrender.com' }}
         with:
-          tagName: "" # Don't auto-create a tag
-          releaseName: "" # Don't auto-create a release
+          tagName: ${{ needs.release-please.outputs.tag-name }}
+          releaseName: "PasswordPal ${{ needs.release-please.outputs.tag-name }}"
+          releaseId: "" # release-please already created it; tauri-action uploads assets to it
 
       - name: Upload platform bundles
         uses: actions/upload-artifact@v4
@@ -281,69 +209,13 @@ jobs:
           retention-days: 30
 
   # ──────────────────────────────────────────
-  # JOB 4: Create GitHub Release (main only)
-  # Attaches all platform binaries
-  # Only creates releases when explicitly triggered
-  # ──────────────────────────────────────────
-  release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: [build-tauri, check-conventional-commits]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.check-conventional-commits.outputs.should-version == 'true'
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download all platform artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-artifacts/
-
-      - name: Get version from package.json
-        id: version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: "PasswordPal ${{ steps.version.outputs.tag }}"
-          body: |
-            ## Automated Release
-
-            **Version:** `${{ steps.version.outputs.version }}` (${{ needs.check-conventional-commits.outputs.version-type }})
-            **Commit:** `${{ github.sha }}`
-            **Branch:** `${{ github.ref_name }}`
-            **Build date:** ${{ github.event.head_commit.timestamp }}
-            **Commit message:** `${{ github.event.head_commit.message }}`
-
-            ### Downloads
-            | Platform | File |
-            |---|---|
-            | 🐧 Linux | `.deb` / `.AppImage` |
-            | 🍎 macOS | `.dmg` |
-            | 🪟 Windows | `.exe` / `.msi` |
-          files: release-artifacts/**/*
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ──────────────────────────────────────────
   # JOB 5: Notify on failure
   # ──────────────────────────────────────────
   notify-failure:
     name: Notify on Pipeline Failure
     runs-on: ubuntu-latest
-    needs: [test-react, test-rust, check-conventional-commits]
-    if: failure() && (needs.test-react.result == 'failure' || needs.test-rust.result == 'failure' || needs.check-conventional-commits.result == 'failure')
+    needs: [test-react, test-rust]
+    if: failure() && (needs.test-react.result == 'failure' || needs.test-rust.result == 'failure')
 
     steps:
       - name: Post failure notification
