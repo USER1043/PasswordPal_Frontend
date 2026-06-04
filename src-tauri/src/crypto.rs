@@ -1,12 +1,15 @@
+//! @file Core cryptographic functions for key generation and derivation.
+//! @module crypto
+
 use argon2::{
     password_hash::{PasswordHasher, Salt},
-    Argon2,
+    Algorithm, Argon2, Params, Version,
 };
 use base64::{engine::general_purpose, Engine as _};
 use rand_core::{OsRng, TryRngCore};
 use zeroize::Zeroizing;
 
-/// Generates a random 32-byte Master Encryption Key (MEK)
+// Generates a random 32-byte Master Encryption Key (MEK)
 pub fn generate_mek() -> Result<Zeroizing<[u8; 32]>, String> {
     let mut mek = Zeroizing::new([0u8; 32]);
     OsRng
@@ -15,7 +18,7 @@ pub fn generate_mek() -> Result<Zeroizing<[u8; 32]>, String> {
     Ok(mek)
 }
 
-/// Generates a random 16-byte Salt
+// Generates a random 16-byte cryptographic salt.
 pub fn generate_salt() -> Result<[u8; 16], String> {
     let mut salt = [0u8; 16];
     OsRng
@@ -34,7 +37,8 @@ pub fn generate_salt() -> Result<[u8; 16], String> {
 /// - Zeroizing<[u8; 32]>: The 32-byte derived KEK, protected from memory dumps.
 pub fn derive_kek(password: &str, salt_bytes: &[u8]) -> Result<Zeroizing<[u8; 32]>, String> {
     let mut output_key = Zeroizing::new([0u8; 32]);
-    let argon2 = Argon2::default();
+    let params = Params::new(65536, 3, 4, Some(32)).map_err(|e| format!("Params error: {}", e))?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
     // Prepare the salt string to satisfy API requirements.
     let salt_b64_string = general_purpose::STANDARD_NO_PAD.encode(salt_bytes);
