@@ -46,7 +46,7 @@ export async function syncOfflineVault(): Promise<void> {
         syncRequested = true;
         return;
     }
-    
+
     isSyncing = true;
     window.dispatchEvent(new Event('sync-start'));
     const userId = getActiveUserEmail();
@@ -57,7 +57,7 @@ export async function syncOfflineVault(): Promise<void> {
             const pendingItems: SyncQueueItem[] = await invoke("get_pending_sync_queue", { userId });
 
             if (pendingItems.length === 0) break;
-            
+
             console.log(`Syncing ${pendingItems.length} offline changes...`);
 
             for (const item of pendingItems) {
@@ -80,7 +80,7 @@ export async function syncOfflineVault(): Promise<void> {
                             version: item.version,
                             record_type: item.record_type,
                         };
-                        
+
                         await apiClient.post("/api/vault", payload);
                         await invoke("mark_synced_local", { id: item.id });
                     }
@@ -115,7 +115,7 @@ export async function syncOfflineVault(): Promise<void> {
                         serverCombined.set(serverNonceBytes);
                         serverCombined.set(serverCipherBytes, serverNonceBytes.length);
                         const serverCombinedB64 = btoa(String.fromCharCode(...serverCombined));
-                        
+
                         // Decrypt server entry
                         const serverEntry = await invoke<VaultEntry>("decrypt_entry", { blobB64: serverCombinedB64 });
 
@@ -138,13 +138,13 @@ export async function syncOfflineVault(): Promise<void> {
                             // Re-submit the sync request with version = server_version + 1
                             const localPayload = {
                                 id: item.id,
-                                encrypted_data: item.encrypted_data, 
+                                encrypted_data: item.encrypted_data,
                                 nonce: item.nonce,
                                 version: newVersion,
                                 record_type: item.record_type,
                             };
                             await apiClient.post("/api/vault", localPayload);
-                            
+
                             // Update local DB to reflect the new version
                             await invoke("save_entry_local", {
                                 entryId: item.id,
@@ -206,14 +206,14 @@ export async function fetchVault(): Promise<DecryptedVaultRecord[]> {
                 recordType: record.record_type || 'credential'
             });
         }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-         if (err.message === "Network Error" || err.code === "ERR_NETWORK" || !err.response || err.response?.status === 503) {
+        if (err.message === "Network Error" || err.code === "ERR_NETWORK" || !err.response || err.response?.status === 503) {
             console.warn("Offline mode: Fetching natively from Rust local_vault.");
-         } else {
+        } else {
             console.error("fetchVault backend error:", err);
             // Don't throw if we can still try to return local Rust data
-         }
+        }
     }
 
     try {
@@ -252,7 +252,6 @@ export async function saveEntry(
 
         // 2. Trigger async sync process
         syncOfflineVault().catch((e) => console.error("Sync failed:", e));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
         console.error("Local database error:", err);
         // Alert the user instead of unhandled promise rejection crashing React

@@ -65,7 +65,7 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     try {
       const items = await vaultService.fetchVault();
       setPasswords(items.map(toPasswordData));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("Failed to load vault:", err);
       const online = await isServerReachable();
@@ -96,15 +96,15 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
   const filteredPasswords = passwords.filter((pwd) => {
     const pwdName = pwd?.name?.toLowerCase() ?? "";
     const pwdUrl = pwd?.url?.toLowerCase() ?? "";
-    
+
     const matchesSearch =
       pwdName.includes(searchQuery.toLowerCase()) ||
       pwdUrl.includes(searchQuery.toLowerCase());
-      
+
     const matchesFolder =
       selectedFolder === "all" ||
       pwd?.folder?.toLowerCase() === selectedFolder.toLowerCase();
-      
+
     return matchesSearch && matchesFolder;
   });
 
@@ -112,8 +112,8 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     try {
       const entry = toVaultEntry(data);
       if (editingPassword?.id) {
-        // Must explicitly pass the version from the original editingPassword tracking state
-        // data.version from the modal might be undefined if not strictly passed through
+        // Must explicitly pass the version from the original password for tracking it
+        // data.version from the modal might be undefined if not already exists
         await vaultService.saveEntry(entry, editingPassword.id, editingPassword.version);
       } else {
         await vaultService.saveEntry(entry);
