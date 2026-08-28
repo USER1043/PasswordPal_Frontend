@@ -7,6 +7,7 @@ use tauri::State;
 ///
 /// This function decodes the key, validates its length, and securely stores it in the application state.
 #[tauri::command]
+#[allow(dead_code)]
 pub fn unlock_vault(state: State<'_, Mutex<VaultState>>, key_b64: String) -> Result<(), String> {
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
     unlock_vault_logic(&mut st, key_b64)
