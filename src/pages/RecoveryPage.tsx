@@ -64,11 +64,19 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
                 newPassword,
             });
 
+            // SECURITY FIX: Hash the recovery key client-side using Argon2id before sending to server
+            // Using the same security parameters as the rest of the system:
+            // Memory (m): 64 MiB, Time/Iterations (t): 3 passes, Parallelism (p): 4 lanes/threads
+            // The server should NEVER receive the raw MEK (recovery key)
+            const recoveryKeyHash = await invoke<string>("hash_recovery_key_command", {
+                recoveryKey: recoveryKey.trim(),
+            });
+
             // Send new credentials to backend. Backend verifies the recovery key hash
             // server-side before updating.
             await apiClient.post("/auth/recover", {
                 email,
-                recovery_key: recoveryKey.trim(),
+                recovery_key_hash: recoveryKeyHash,  // ← Send Argon2id hash instead of raw key
                 new_salt: recoverData.new_salt,
                 new_wrapped_mek: recoverData.new_wrapped_mek,
                 new_auth_hash: recoverData.new_auth_hash,

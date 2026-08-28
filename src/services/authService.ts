@@ -91,11 +91,11 @@ export const authService = {
             password: masterPassword,
         });
 
-        const recoveryKeyBytes = new TextEncoder().encode(verifyKeys.recovery_key);
-        const hashBuffer = await crypto.subtle.digest("SHA-256", recoveryKeyBytes);
-        const recoveryKeyHash = Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, "0"))
-            .join("");
+        // SECURITY: Hash recovery key using Argon2id with consistent security parameters
+        // Memory (m): 64 MiB, Time/Iterations (t): 3 passes, Parallelism (p): 4 lanes/threads
+        const recoveryKeyHash = await invoke<string>("hash_recovery_key_command", {
+            recoveryKey: verifyKeys.recovery_key,
+        });
 
         await apiClient.post("/auth/register", {
             email,
