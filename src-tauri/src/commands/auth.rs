@@ -238,6 +238,13 @@ pub struct RecoverVaultResponse {
     pub new_auth_hash: String,
 }
 
+/// Hash the recovery key using Argon2id with consistent security parameters
+/// This is called client-side before sending to server for zero-knowledge recovery
+#[tauri::command]
+pub fn hash_recovery_key_command(recovery_key: String) -> Result<String, String> {
+    crypto::hash_recovery_key(&recovery_key)
+}
+
 /// Core logic for recovering a vault using the recovery key.
 /// The recovery key IS the raw MEK in base64. We re-wrap it under the new password.
 pub fn recover_vault_logic(

@@ -32,6 +32,7 @@ pub fn run() {
             commands::auth::register_vault,
             commands::auth::login_vault,
             commands::auth::recover_vault,
+            commands::auth::hash_recovery_key_command,
             commands::os::get_os_info,
             db::save_entry_local,
             db::save_server_record_local,
