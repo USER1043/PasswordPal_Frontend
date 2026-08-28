@@ -1,6 +1,4 @@
-use argon2::{
-    password_hash::{PasswordHasher, Salt},
-};
+use argon2::password_hash::{PasswordHasher, Salt};
 use base64::{engine::general_purpose, Engine as _};
 use rand_core::{OsRng, TryRngCore};
 use zeroize::Zeroizing;
@@ -50,7 +48,7 @@ pub fn generate_salt() -> Result<[u8; 16], String> {
 /// - Zeroizing<[u8; 32]>: The 32-byte derived KEK, protected from memory dumps.
 pub fn derive_kek(password: &str, salt_bytes: &[u8]) -> Result<Zeroizing<[u8; 32]>, String> {
     let mut output_key = Zeroizing::new([0u8; 32]);
-    
+
     let argon2 = argon2::Argon2::new(
         argon2::Algorithm::Argon2id,
         argon2::Version::V0x13,
@@ -106,12 +104,12 @@ pub fn hash_recovery_key(recovery_key: &str) -> Result<String, String> {
 
     // Generate random salt bytes manually
     let mut salt_bytes = [0u8; 16];
-    OsRng.try_fill_bytes(&mut salt_bytes)
+    OsRng
+        .try_fill_bytes(&mut salt_bytes)
         .map_err(|e| format!("Failed to generate salt: {}", e))?;
     let salt_b64 = general_purpose::STANDARD_NO_PAD.encode(&salt_bytes);
-    let salt = Salt::from_b64(&salt_b64)
-        .map_err(|e| format!("Invalid salt encoding: {}", e))?;
-    
+    let salt = Salt::from_b64(&salt_b64).map_err(|e| format!("Invalid salt encoding: {}", e))?;
+
     let password_hash = argon2
         .hash_password(recovery_key.as_bytes(), salt)
         .map_err(|e| format!("Argon2 hashing failed: {}", e))?;

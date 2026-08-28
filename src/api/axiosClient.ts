@@ -50,6 +50,7 @@ interface FetchOptions {
 
 // Custom adapter to replace axios and use Tauri's native Rust HTTP client
 // By using Tauri's fetch we bypass the browser's CORS restrictions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promise<any> {
   let fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
 

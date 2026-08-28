@@ -326,4 +326,3 @@ fn test_derive_auth_hash_success() {
     assert!(derived_hash.is_ok());
     assert_eq!(derived_hash.unwrap(), reg_response.auth_hash);
 }
-

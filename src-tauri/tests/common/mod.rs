@@ -1,9 +1,7 @@
 // Common test utilities and helpers for integration tests
 #![allow(dead_code)]
 
-use argon2::{
-    password_hash::{PasswordHasher, Salt},
-};
+use argon2::password_hash::{PasswordHasher, Salt};
 use base64::{engine::general_purpose, Engine as _};
 use zeroize::Zeroizing;
 

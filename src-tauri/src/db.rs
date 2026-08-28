@@ -135,15 +135,20 @@ pub fn upsert_local_vault_record(
     vault_state: State<'_, Mutex<VaultState>>,
     payload: UpsertRecordPayload,
 ) -> Result<(), String> {
-    let (final_encrypted_data, final_nonce) = match (payload.entry, payload.encrypted_data, payload.nonce) {
-        (Some(entry), _, _) => {
-            let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
-            let blob_b64 = crate::commands::entry::encrypt_entry_logic(&st, &entry)?;
-            split_blob(&blob_b64)?
-        }
-        (None, Some(enc_data), Some(nonce)) => (enc_data, nonce),
-        _ => return Err("Invalid payload: must provide either entry or encrypted_data + nonce".into()),
-    };
+    let (final_encrypted_data, final_nonce) =
+        match (payload.entry, payload.encrypted_data, payload.nonce) {
+            (Some(entry), _, _) => {
+                let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
+                let blob_b64 = crate::commands::entry::encrypt_entry_logic(&st, &entry)?;
+                split_blob(&blob_b64)?
+            }
+            (None, Some(enc_data), Some(nonce)) => (enc_data, nonce),
+            _ => {
+                return Err(
+                    "Invalid payload: must provide either entry or encrypted_data + nonce".into(),
+                )
+            }
+        };
 
     let conn = db_state.conn.lock().map_err(|_| "DbState corrupted")?;
     conn.execute(
