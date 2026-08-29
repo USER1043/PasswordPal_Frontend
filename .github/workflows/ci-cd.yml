@@ -3,8 +3,16 @@ name: Frontend CI/CD
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CHANGELOG.md'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CHANGELOG.md'
 
 env:
   NODE_VERSION: "20"
@@ -13,10 +21,12 @@ env:
 jobs:
   # ──────────────────────────────────────────
   # JOB 1: React / TypeScript Tests & Lint
+  # Runs ONLY on Feature Pull Requests
   # ──────────────────────────────────────────
   test-react:
     name: React Unit Tests & Lint
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release-please')
 
     steps:
       - name: Checkout repository
@@ -40,7 +50,7 @@ jobs:
       - name: Run React unit tests (vitest + jsdom)
         run: npm test -- --run
         env:
-          VITE_BACKEND_URL: http://localhost:3000 # Just to satisfy the env check while testing
+          VITE_BACKEND_URL: http://localhost:3000
 
       - name: Build web assets (Vite)
         run: npm run build
@@ -56,10 +66,12 @@ jobs:
 
   # ──────────────────────────────────────────
   # JOB 2: Rust / Tauri Tests
+  # Runs ONLY on Feature Pull Requests
   # ──────────────────────────────────────────
   test-rust:
     name: Rust Crypto Tests
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release-please')
 
     steps:
       - name: Checkout repository
@@ -100,9 +112,7 @@ jobs:
 
   # ──────────────────────────────────────────
   # JOB 3: Release Please
-  # Scans commits since last release tag and
-  # opens/updates a Release PR automatically.
-  # Merging that PR creates the GitHub Release.
+  # Runs on push to main branch
   # ──────────────────────────────────────────
   release-please:
     name: Release Please
@@ -123,13 +133,11 @@ jobs:
 
   # ──────────────────────────────────────────
   # JOB 4: Build Tauri Desktop Binaries
-  # Runs only when release-please creates a
-  # release (i.e. the Release PR was merged).
-  # Builds for all 3 platforms in parallel.
+  # Runs pre-build test suite before compiling binaries
   # ──────────────────────────────────────────
   build-tauri:
     name: Build Tauri - ${{ matrix.platform }}
-    needs: [test-react, test-rust, release-please]
+    needs: [release-please]
     if: |
       github.ref == 'refs/heads/main' &&
       github.event_name == 'push' &&
@@ -150,7 +158,7 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     permissions:
-      contents: write  # required to upload assets to the GitHub Release
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -166,6 +174,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy, rustfmt
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -186,6 +195,11 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Run verification test suite before build
+        run: npm run test:all
+        env:
+          VITE_BACKEND_URL: http://localhost:3000
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -194,8 +208,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_BACKEND_URL: https://passwordpal-backend.onrender.com
         with:
-          # Use the numeric release ID from release-please so tauri-action uploads
-          # assets to the existing release instead of trying to create a duplicate
           releaseId: ${{ needs.release-please.outputs.release-id }}
 
       - name: Upload platform bundles
