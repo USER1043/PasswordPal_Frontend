@@ -107,7 +107,7 @@ pub fn hash_recovery_key(recovery_key: &str) -> Result<String, String> {
     OsRng
         .try_fill_bytes(&mut salt_bytes)
         .map_err(|e| format!("Failed to generate salt: {}", e))?;
-    let salt_b64 = general_purpose::STANDARD_NO_PAD.encode(&salt_bytes);
+    let salt_b64 = general_purpose::STANDARD_NO_PAD.encode(salt_bytes);
     let salt = Salt::from_b64(&salt_b64).map_err(|e| format!("Invalid salt encoding: {}", e))?;
 
     let password_hash = argon2
