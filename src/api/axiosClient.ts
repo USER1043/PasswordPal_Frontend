@@ -15,7 +15,8 @@ let cachedUserAgent: string | null = null;
 async function getUserAgent(): Promise<string> {
   if (cachedUserAgent) return cachedUserAgent;
   try {
-    cachedUserAgent = await invoke<string>("get_os_info");
+    const identity = await invoke<{ device_id: string; device_name: string }>("get_local_identity");
+    cachedUserAgent = `${identity.device_name} (ID: ${identity.device_id})`;
   } catch {
     cachedUserAgent = navigator.userAgent;
   }

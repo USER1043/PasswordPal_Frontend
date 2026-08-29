@@ -117,23 +117,38 @@ fn combine_blob(nonce_b64: &str, ciphertext_b64: &str) -> Result<String, String>
     Ok(general_purpose::STANDARD.encode(nonce))
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpsertRecordPayload {
+    pub id: String,
+    pub user_id: String,
+    pub entry: Option<VaultEntry>,
+    pub encrypted_data: Option<String>,
+    pub nonce: Option<String>,
+    pub version: i64,
+    pub sync_status: String,
+    pub record_type: String,
+}
+
 #[command]
-#[allow(clippy::too_many_arguments)]
-pub fn save_entry_local(
+pub fn upsert_local_vault_record(
     db_state: State<'_, DbState>,
     vault_state: State<'_, Mutex<VaultState>>,
-    entry_id: String,
-    user_id: String,
-    entry: VaultEntry,
-    version: i64,
-    record_type: String,
-    sync_status: String,
+    payload: UpsertRecordPayload,
 ) -> Result<(), String> {
-    let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
-
-    // 1. Encrypt in Rust RAM before hitting SQLite
-    let blob_b64 = crate::commands::entry::encrypt_entry_logic(&st, &entry)?;
-    let (nonce, encrypted_data) = split_blob(&blob_b64)?;
+    let (final_encrypted_data, final_nonce) =
+        match (payload.entry, payload.encrypted_data, payload.nonce) {
+            (Some(entry), _, _) => {
+                let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
+                let blob_b64 = crate::commands::entry::encrypt_entry_logic(&st, &entry)?;
+                split_blob(&blob_b64)?
+            }
+            (None, Some(enc_data), Some(nonce)) => (enc_data, nonce),
+            _ => {
+                return Err(
+                    "Invalid payload: must provide either entry or encrypted_data + nonce".into(),
+                )
+            }
+        };
 
     let conn = db_state.conn.lock().map_err(|_| "DbState corrupted")?;
     conn.execute(
@@ -146,34 +161,16 @@ pub fn save_entry_local(
          sync_status=excluded.sync_status,
          record_type=excluded.record_type",
         params![
-            entry_id, user_id, encrypted_data, nonce, version, sync_status, record_type
+            payload.id,
+            payload.user_id,
+            final_encrypted_data,
+            final_nonce,
+            payload.version,
+            payload.sync_status,
+            payload.record_type
         ],
-    ).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[command]
-pub fn save_server_record_local(
-    db_state: State<'_, DbState>,
-    id: String,
-    user_id: String,
-    encrypted_data: String,
-    nonce: String,
-    version: i64,
-    record_type: String,
-) -> Result<(), String> {
-    let conn = db_state.conn.lock().map_err(|_| "DbState corrupted")?;
-    conn.execute(
-        "INSERT INTO local_vault (id, user_id, encrypted_data, nonce, version, sync_status, record_type)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'synced', ?6)
-         ON CONFLICT(id) DO UPDATE SET
-         encrypted_data=excluded.encrypted_data,
-         nonce=excluded.nonce,
-         version=excluded.version,
-         sync_status=excluded.sync_status,
-         record_type=excluded.record_type",
-        params![id, user_id, encrypted_data, nonce, version, record_type],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 

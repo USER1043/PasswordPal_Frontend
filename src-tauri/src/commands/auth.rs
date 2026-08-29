@@ -88,6 +88,23 @@ pub fn register_vault(
     Ok(response)
 }
 
+/// Core logic for deriving auth_hash from password and salt.
+pub fn derive_auth_hash_logic(password: String, salt: String) -> Result<String, String> {
+    let salt_bytes = general_purpose::STANDARD
+        .decode(salt)
+        .map_err(|_| "Invalid salt base64")?;
+    let kek = crypto::derive_kek(&password, &salt_bytes)?;
+    let (auth_key, _) = crypto::derive_keys_from_kek(&*kek);
+    Ok(hex::encode(*auth_key))
+}
+
+/// Derives AuthHash for server authentication without unwrapping MEK.
+#[tauri::command]
+pub fn derive_auth_hash(password: String, salt: String) -> Result<String, String> {
+    let password = Zeroizing::new(password);
+    derive_auth_hash_logic(password.as_str().to_owned(), salt)
+}
+
 /// Core logic for logging in.
 /// Separated for testing.
 pub fn login_vault_logic(
@@ -236,6 +253,13 @@ pub struct RecoverVaultResponse {
     pub new_salt: String,
     pub new_wrapped_mek: String,
     pub new_auth_hash: String,
+}
+
+/// Hash the recovery key using Argon2id with consistent security parameters
+/// This is called client-side before sending to server for zero-knowledge recovery
+#[tauri::command]
+pub fn hash_recovery_key_command(recovery_key: String) -> Result<String, String> {
+    crypto::hash_recovery_key(&recovery_key)
 }
 
 /// Core logic for recovering a vault using the recovery key.

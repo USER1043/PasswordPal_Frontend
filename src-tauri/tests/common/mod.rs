@@ -1,12 +1,17 @@
 // Common test utilities and helpers for integration tests
 #![allow(dead_code)]
 
-use argon2::{
-    password_hash::{PasswordHasher, Salt},
-    Argon2,
-};
+use argon2::password_hash::{PasswordHasher, Salt};
 use base64::{engine::general_purpose, Engine as _};
 use zeroize::Zeroizing;
+
+/// Returns consistent Argon2id security parameters for testing (matching production)
+/// - Memory (m): 64 MiB (65536 KiB)
+/// - Time/Iterations (t): 3 passes
+/// - Parallelism (p): 4 lanes/threads
+fn get_argon2_params() -> argon2::Params {
+    argon2::Params::new(65536, 3, 4, None).unwrap()
+}
 
 /// Creates a test encryption key (32 bytes of zeros)
 pub fn get_test_key() -> Vec<u8> {
@@ -18,10 +23,14 @@ pub fn get_test_key_b64() -> String {
     general_purpose::STANDARD.encode(get_test_key())
 }
 
-/// Derives a key from a password and salt using Argon2 (for testing)
+/// Derives a key from a password and salt using Argon2id with production parameters (for testing)
 pub fn derive_test_key(password: &str, salt: &[u8]) -> Zeroizing<[u8; 32]> {
     let mut output_key = Zeroizing::new([0u8; 32]);
-    let argon2 = Argon2::default();
+    let argon2 = argon2::Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        get_argon2_params(),
+    );
     let salt_b64 = general_purpose::STANDARD_NO_PAD.encode(salt);
     let s = Salt::from_b64(&salt_b64).unwrap();
     let hash = argon2.hash_password(password.as_bytes(), s).unwrap();

@@ -67,7 +67,7 @@ export interface LoginResponse {
 
 export interface AuthParams {
     salt: string;
-    wrapped_mek: string;
+    wrapped_mek?: string;
 }
 
 export interface LoginResult {
@@ -91,11 +91,11 @@ export const authService = {
             password: masterPassword,
         });
 
-        const recoveryKeyBytes = new TextEncoder().encode(verifyKeys.recovery_key);
-        const hashBuffer = await crypto.subtle.digest("SHA-256", recoveryKeyBytes);
-        const recoveryKeyHash = Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, "0"))
-            .join("");
+        // SECURITY: Hash recovery key using Argon2id with consistent security parameters
+        // Memory (m): 64 MiB, Time/Iterations (t): 3 passes, Parallelism (p): 4 lanes/threads
+        const recoveryKeyHash = await invoke<string>("hash_recovery_key_command", {
+            recoveryKey: verifyKeys.recovery_key,
+        });
 
         await apiClient.post("/auth/register", {
             email,
@@ -111,7 +111,7 @@ export const authService = {
     },
 
     /**
-     * Step 1 of Login: Get authentication parameters (salt + wrapped MEK)
+     * Step 1 of Login: Get authentication parameters (salt only when online)
      */
     async getParams(email: string): Promise<AuthParams> {
         const getOfflineParams = async () => {
@@ -152,12 +152,14 @@ export const authService = {
     },
 
     /**
-     * Step 2 of Login: Derive keys in Rust, authenticate with backend.
+     * Step 2 of Login: Derive auth_hash in Rust, authenticate with backend.
+     * On successful authentication, server returns wrapped_mek to unlock Rust vault.
      * Returns login result indicating if MFA is required or if it's Offline Mode.
      */
     async login(email: string, masterPassword: string, deviceFingerprint?: string): Promise<LoginResult> {
         const params = await this.getParams(email);
-        const { salt, wrapped_mek } = params;
+        const { salt } = params;
+        const localWrappedMek = params.wrapped_mek;
         const localPasswordHash = (params as unknown as Record<string, unknown>).local_password_hash as string | undefined;
 
         let finalDeviceName = deviceFingerprint || "Unknown Device";
@@ -169,32 +171,18 @@ export const authService = {
             console.error("Failed to fetch persistent device identity from SQLite:", e);
         }
 
-        let loginData: LoginResponse;
+        const online = await isServerReachable();
 
-        // Try decryption natively in Rust
-        try {
-            loginData = await invoke<LoginResponse>("login_vault", {
+        if (!online) {
+            console.warn("[Auth] Probe failed - entering offline mode for login");
+            if (!localWrappedMek) {
+                throw new Error("No offline login data available for this email.");
+            }
+            const loginData = await invoke<LoginResponse>("login_vault", {
                 password: masterPassword,
                 salt,
-                wrappedMek: wrapped_mek,
+                wrappedMek: localWrappedMek,
             });
-            // Overwrite the local password variable immediately after invoke resolves
-            masterPassword = "";
-        } catch (err) {
-            // ZERO-KNOWLEDGE AUDIT FIX
-            // If local decryption fails but server is alive, intentionally hit the server to log the failure
-            const isReachable = await isServerReachable();
-            if (isReachable) {
-                const headers: Record<string, string> = { "User-Agent": finalDeviceName };
-                await apiClient.post("/auth/login", {
-                    email,
-                    auth_hash: "LOCAL_DECRYPTION_FAILED",
-                }, { headers }).catch(() => {});
-            }
-            throw err;
-        }
-
-        const offlineLogin = () => {
             if (localPasswordHash && localPasswordHash === loginData.auth_hash) {
                 localStorage.setItem("active_user", email);
                 localStorage.setItem("offline_token", "mock-offline-token-" + Date.now());
@@ -202,13 +190,18 @@ export const authService = {
             } else {
                 throw new Error("Invalid offline master password signature.");
             }
-        };
+        }
 
-        const online = await isServerReachable();
-
-        if (!online) {
-            console.warn("[Auth] Probe failed - entering offline mode for login");
-            return offlineLogin();
+        // Online Mode: Derive auth_hash in Rust without requiring wrapped_mek
+        let derivedAuthHash: string;
+        try {
+            derivedAuthHash = await invoke<string>("derive_auth_hash", {
+                password: masterPassword,
+                salt,
+            });
+        } catch (err) {
+            console.error("Failed to derive auth hash:", err);
+            throw err;
         }
 
         try {
@@ -216,8 +209,20 @@ export const authService = {
 
             const response = await apiClient.post("/auth/login", {
                 email,
-                auth_hash: loginData.auth_hash,
-            }, { headers }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string }>;
+                auth_hash: derivedAuthHash,
+            }, { headers }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string; wrapped_mek?: string }>;
+
+            const serverWrappedMek = response.data?.wrapped_mek || localWrappedMek;
+
+            if (serverWrappedMek) {
+                // Password authenticated by server; unwrap MEK and unlock vault state in Rust
+                await invoke<LoginResponse>("login_vault", {
+                    password: masterPassword,
+                    salt,
+                    wrappedMek: serverWrappedMek,
+                });
+                await cacheAuthParams(email, salt, serverWrappedMek, derivedAuthHash);
+            }
 
             if (response.data?.mfa_required) {
                 return {
@@ -227,16 +232,24 @@ export const authService = {
                 };
             }
 
-            await cacheAuthParams(email, salt, wrapped_mek, loginData.auth_hash);
             localStorage.setItem("active_user", email);
             localStorage.removeItem("offline_token");
 
             return { success: true, isOfflineMode: false };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
-             if (isNetworkFailure(err)) {
+             if (isNetworkFailure(err) && localWrappedMek) {
                  console.warn("[Auth] Axios failed after probe - race condition fallback");
-                 return offlineLogin();
+                 const loginData = await invoke<LoginResponse>("login_vault", {
+                     password: masterPassword,
+                     salt,
+                     wrappedMek: localWrappedMek,
+                 });
+                 if (localPasswordHash && localPasswordHash === loginData.auth_hash) {
+                     localStorage.setItem("active_user", email);
+                     localStorage.setItem("offline_token", "mock-offline-token-" + Date.now());
+                     return { success: true, isOfflineMode: true };
+                 }
              }
              throw err;
         }

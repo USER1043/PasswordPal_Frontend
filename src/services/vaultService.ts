@@ -146,23 +146,28 @@ export async function syncOfflineVault(): Promise<void> {
                             await apiClient.post("/api/vault", localPayload);
                             
                             // Update local DB to reflect the new version
-                            await invoke("save_entry_local", {
-                                entryId: item.id,
-                                userId,
-                                entry: localEntry,
-                                version: newVersion,
-                                recordType: item.record_type,
-                                syncStatus: "synced"
+                            await invoke("upsert_local_vault_record", {
+                                payload: {
+                                    id: item.id,
+                                    user_id: userId,
+                                    entry: localEntry,
+                                    version: newVersion,
+                                    sync_status: "synced",
+                                    record_type: item.record_type
+                                }
                             });
                         } else {
                             // Overwrite the local SQLite record with the server's data
-                            await invoke("save_server_record_local", {
-                                id: item.id,
-                                userId,
-                                encryptedData: serverRecord.encrypted_data,
-                                nonce: serverRecord.nonce,
-                                version: serverRecord.version,
-                                recordType: serverRecord.record_type || 'credential'
+                            await invoke("upsert_local_vault_record", {
+                                payload: {
+                                    id: item.id,
+                                    user_id: userId,
+                                    encrypted_data: serverRecord.encrypted_data,
+                                    nonce: serverRecord.nonce,
+                                    version: serverRecord.version,
+                                    sync_status: "synced",
+                                    record_type: serverRecord.record_type || 'credential'
+                                }
                             });
                         }
                     } else {
@@ -197,13 +202,16 @@ export async function fetchVault(): Promise<DecryptedVaultRecord[]> {
             }
 
             // Push synced items down to Rust local vault to bypass React crypto
-            await invoke("save_server_record_local", {
-                id: record.id,
-                userId,
-                encryptedData: record.encrypted_data,
-                nonce: record.nonce,
-                version: record.version,
-                recordType: record.record_type || 'credential'
+            await invoke("upsert_local_vault_record", {
+                payload: {
+                    id: record.id,
+                    user_id: userId,
+                    encrypted_data: record.encrypted_data,
+                    nonce: record.nonce,
+                    version: record.version,
+                    sync_status: "synced",
+                    record_type: record.record_type || 'credential'
+                }
             });
         }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,13 +249,15 @@ export async function saveEntry(
 
     try {
         // 1. Instantly defer to Rust. Never encrypt in TS.
-        await invoke("save_entry_local", {
-            entryId: id,
-            userId,
-            entry: data,
-            version: activeVersion,
-            recordType,
-            syncStatus
+        await invoke("upsert_local_vault_record", {
+            payload: {
+                id,
+                user_id: userId,
+                entry: data,
+                version: activeVersion,
+                sync_status: syncStatus,
+                record_type: recordType
+            }
         });
 
         // 2. Trigger async sync process

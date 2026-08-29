@@ -9,7 +9,7 @@ use aes_gcm::{
 use base64::{engine::general_purpose, Engine as _};
 use common::{derive_test_key, get_test_salt, get_test_salt_b64};
 use passwordpal_lib::commands::auth::{
-    change_password_optimization, login_vault_logic, register_vault_logic,
+    change_password_optimization, derive_auth_hash_logic, login_vault_logic, register_vault_logic,
 };
 use zeroize::Zeroizing;
 
@@ -315,4 +315,14 @@ fn test_login_vault_failure_wrong_password() {
     );
 
     assert!(login_result.is_err());
+}
+
+#[test]
+fn test_derive_auth_hash_success() {
+    let password = "test_password";
+    let (reg_response, _) = register_vault_logic(password.to_string()).unwrap();
+
+    let derived_hash = derive_auth_hash_logic(password.to_string(), reg_response.salt.clone());
+    assert!(derived_hash.is_ok());
+    assert_eq!(derived_hash.unwrap(), reg_response.auth_hash);
 }
