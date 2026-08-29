@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.2.1...passwordpal-v0.3.0) (2026-08-29)
+
+
+### Features
+
+* **auth:** implement client-side derive_auth_hash command and deferred MEK login flow ([fcd81d6](https://github.com/USER1043/PasswordPal_Frontend/commit/fcd81d665c278b14486fb6b40eecbdfdf7dbdf77))
+* **rust:** expose hash_recovery_key_command Tauri command ([89cd776](https://github.com/USER1043/PasswordPal_Frontend/commit/89cd7761f1a5546d5032f150e23912e6a4391c4d))
+
+
+### Bug Fixes
+
+* **ci:** apply rustfmt formatting and fix eslint no-explicit-any in axiosClient ([56bc598](https://github.com/USER1043/PasswordPal_Frontend/commit/56bc598e5e2480379aa77473a4a9b5ed92386f74))
+* **rust:** remove invalid engine dependency and add allow dead_code attribute ([7e61603](https://github.com/USER1043/PasswordPal_Frontend/commit/7e6160339a2452f6d0956fa414ce68ca3053ca75))
+* update crypto.rs to remove unnecessary borrow and update the package.json scripts for easier local testing ([2e0126c](https://github.com/USER1043/PasswordPal_Frontend/commit/2e0126c88c6f5b8833d80a5fcbd381801c115061))
+
 ## [0.2.1](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.2.0...passwordpal-v0.2.1) (2026-05-13)
 
 
