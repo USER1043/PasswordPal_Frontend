@@ -15,7 +15,7 @@ on:
       - 'CHANGELOG.md'
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
   RUST_TOOLCHAIN: stable
 
 jobs:
