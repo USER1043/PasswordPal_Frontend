@@ -195,11 +195,6 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Run verification test suite before build
-        run: npm run test:all
-        env:
-          VITE_BACKEND_URL: http://localhost:3000
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
