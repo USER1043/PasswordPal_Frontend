@@ -145,13 +145,21 @@ pub fn upsert_local_vault_record(
                 let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
                 let blob_b64 = crate::commands::entry::encrypt_entry_logic(&st, &entry)?;
                 let result = split_blob(&blob_b64)?;
-                eprintln!("[upsert] entry path -> nonce_len={} enc_data_len={}", result.0.len(), result.1.len());
+                eprintln!(
+                    "[upsert] entry path -> nonce_len={} enc_data_len={}",
+                    result.0.len(),
+                    result.1.len()
+                );
                 result
             }
             // Pass-through: caller already has split fields from the server.
             // Must return (nonce, enc_data) to match (final_nonce, final_encrypted_data).
             (None, Some(enc_data), Some(nonce)) => {
-                eprintln!("[upsert] passthrough path -> nonce_len={} enc_data_len={}", nonce.len(), enc_data.len());
+                eprintln!(
+                    "[upsert] passthrough path -> nonce_len={} enc_data_len={}",
+                    nonce.len(),
+                    enc_data.len()
+                );
                 (nonce, enc_data)
             }
             _ => {
@@ -220,25 +228,25 @@ pub fn fetch_vault_local(
     for (id, encrypted_data, nonce, version, sync_status, record_type) in rows.flatten() {
         eprintln!(
             "[fetch] id={} nonce_len={} enc_data_len={}",
-            &id[..8], nonce.len(), encrypted_data.len()
+            &id[..8],
+            nonce.len(),
+            encrypted_data.len()
         );
         // Decrypt entirely in Rust RAM. Send plaintext to frontend over IPC.
         match combine_blob(&nonce, &encrypted_data) {
-            Ok(blob_b64) => {
-                match crate::commands::entry::decrypt_entry_logic(&st, &blob_b64) {
-                    Ok(plaintext_entry) => {
-                        eprintln!("[fetch] id={} decrypt OK", &id[..8]);
-                        decrypted_vault.push(VaultRecord {
-                            id,
-                            entry: plaintext_entry,
-                            version,
-                            sync_status,
-                            record_type,
-                        });
-                    }
-                    Err(e) => eprintln!("[fetch] id={} decrypt FAILED: {}", &id[..8], e),
+            Ok(blob_b64) => match crate::commands::entry::decrypt_entry_logic(&st, &blob_b64) {
+                Ok(plaintext_entry) => {
+                    eprintln!("[fetch] id={} decrypt OK", &id[..8]);
+                    decrypted_vault.push(VaultRecord {
+                        id,
+                        entry: plaintext_entry,
+                        version,
+                        sync_status,
+                        record_type,
+                    });
                 }
-            }
+                Err(e) => eprintln!("[fetch] id={} decrypt FAILED: {}", &id[..8], e),
+            },
             Err(e) => eprintln!("[fetch] id={} combine_blob FAILED: {}", &id[..8], e),
         }
     }
