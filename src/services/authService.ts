@@ -156,20 +156,11 @@ export const authService = {
      * On successful authentication, server returns wrapped_mek to unlock Rust vault.
      * Returns login result indicating if MFA is required or if it's Offline Mode.
      */
-    async login(email: string, masterPassword: string, deviceFingerprint?: string): Promise<LoginResult> {
+    async login(email: string, masterPassword: string): Promise<LoginResult> {
         const params = await this.getParams(email);
         const { salt } = params;
         const localWrappedMek = params.wrapped_mek;
         const localPasswordHash = (params as unknown as Record<string, unknown>).local_password_hash as string | undefined;
-
-        let finalDeviceName = deviceFingerprint || "Unknown Device";
-        try {
-            const identity = await invoke<{device_id: string, device_name: string}>("get_local_identity");
-            // Formats to: linux/prajan-karthik (ID: 123e4567-e89b-12d3... )
-            finalDeviceName = `${identity.device_name} (ID: ${identity.device_id})`;
-        } catch (e) {
-            console.error("Failed to fetch persistent device identity from SQLite:", e);
-        }
 
         const online = await isServerReachable();
 
@@ -205,12 +196,11 @@ export const authService = {
         }
 
         try {
-            const headers: Record<string, string> = { "User-Agent": finalDeviceName };
-
+            // User-Agent and X-Device-Id are attached by the API client
             const response = await apiClient.post("/auth/login", {
                 email,
                 auth_hash: derivedAuthHash,
-            }, { headers }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string; wrapped_mek?: string }>;
+            }) as ApiResponse<{ mfa_required?: boolean; tempToken?: string; wrapped_mek?: string }>;
 
             const serverWrappedMek = response.data?.wrapped_mek || localWrappedMek;
 

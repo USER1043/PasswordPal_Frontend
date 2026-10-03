@@ -7,6 +7,8 @@ interface AddPasswordModalProps {
     onClose: () => void;
     onSave: (data: PasswordData) => void;
     editData?: PasswordData | null;
+    existingFolders?: string[];
+    existingUsernames?: string[];
 }
 
 export interface PasswordData {
@@ -26,6 +28,8 @@ export default function AddPasswordModal({
     onClose,
     onSave,
     editData,
+    existingFolders = [],
+    existingUsernames = [],
 }: AddPasswordModalProps) {
     const [formData, setFormData] = useState<PasswordData>(
         editData || {
@@ -44,6 +48,28 @@ export default function AddPasswordModal({
     const [customFolders, setCustomFolders] = useState<string[]>([]);
     const [breachWarning, setBreachWarning] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+
+    const activeUserEmail = typeof window !== "undefined" ? localStorage.getItem("active_user") || "" : "";
+
+    // Dynamically compute all available folder options so editData folder and existing folders are always mapped
+    const defaultFolders = ["Personal", "Work", "Finance", "Social"];
+    const allFolders = Array.from(
+        new Set([
+            ...defaultFolders,
+            ...existingFolders,
+            ...customFolders,
+            ...(editData?.folder ? [editData.folder] : []),
+            ...(formData?.folder ? [formData.folder] : []),
+        ])
+    ).filter(Boolean);
+
+    // Compute unique suggested usernames including active user email
+    const suggestedUsernames = Array.from(
+        new Set([
+            ...(activeUserEmail ? [activeUserEmail] : []),
+            ...existingUsernames,
+        ])
+    ).filter(Boolean);
 
     // Sync incoming editData into local state when the modal opens.
     // This is required because the modal stays mounted in VaultPage, 
@@ -192,18 +218,38 @@ export default function AddPasswordModal({
 
                     {/* Username/Email */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Username or Email <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.username}
-                            onChange={(e) =>
-                                setFormData({ ...formData, username: e.target.value })
-                            }
-                            placeholder="user@example.com"
-                            className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                        />
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-medium text-slate-300">
+                                Username or Email <span className="text-red-400">*</span>
+                            </label>
+                            {activeUserEmail && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, username: activeUserEmail })}
+                                    className="text-xs text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 transition-colors"
+                                    title={`Fill with account email (${activeUserEmail})`}
+                                >
+                                    <span>👤 Use my email ({activeUserEmail})</span>
+                                </button>
+                            )}
+                        </div>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                list="username-suggestions"
+                                value={formData.username}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, username: e.target.value })
+                                }
+                                placeholder="user@example.com"
+                                className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                            />
+                            <datalist id="username-suggestions">
+                                {suggestedUsernames.map((u) => (
+                                    <option key={u} value={u} />
+                                ))}
+                            </datalist>
+                        </div>
                     </div>
 
                     {/* Password */}
@@ -311,13 +357,9 @@ export default function AddPasswordModal({
                                     className="w-full appearance-none bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                                 >
                                     <option value="" className="bg-slate-800 text-slate-300">No Folder</option>
-                                    <option value="Personal" className="bg-slate-800 text-white">📁 Personal</option>
-                                    <option value="Work" className="bg-slate-800 text-white">💼 Work</option>
-                                    <option value="Finance" className="bg-slate-800 text-white">💰 Finance</option>
-                                    <option value="Social" className="bg-slate-800 text-white">🌐 Social</option>
-                                    {customFolders.map((folder) => (
+                                    {allFolders.map((folder) => (
                                         <option key={folder} value={folder} className="bg-slate-800 text-white">
-                                            📂 {folder}
+                                            {folder === "Work" ? "💼" : folder === "Finance" ? "💰" : folder === "Social" ? "🌐" : folder === "Personal" ? "📁" : "📂"} {folder}
                                         </option>
                                     ))}
                                     <option value="__create_new__" className="bg-purple-900/30 text-purple-300 font-semibold">

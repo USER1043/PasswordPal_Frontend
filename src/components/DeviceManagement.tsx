@@ -2,14 +2,16 @@
 // src/components/DeviceManagement.tsx - Device Management Component
 // ============================================================================
 import { useState, useEffect } from "react";
-import { Monitor, Trash2, AlertCircle, Loader2 } from "lucide-react";
-import { getDevices, revokeDevice, type Device } from "../services/deviceService";
+import { Monitor, Trash2, AlertCircle, Loader2, Ban } from "lucide-react";
+import { getDevices, revokeDevice, blockDevice, unblockDevice, type Device } from "../services/deviceService";
+
+type DeviceAction = "revoke" | "block";
 
 export default function DeviceManagement() {
     const [devices, setDevices] = useState<Device[]>([]);
     const [loading, setLoading] = useState(true);
-    const [revoking, setRevoking] = useState<string | null>(null);
-    const [showConfirm, setShowConfirm] = useState<string | null>(null);
+    const [pending, setPending] = useState<string | null>(null);
+    const [showConfirm, setShowConfirm] = useState<{ id: string; action: DeviceAction } | null>(null);
 
     useEffect(() => {
         loadDevices();
@@ -27,16 +29,18 @@ export default function DeviceManagement() {
         }
     };
 
-    const handleRevoke = async (deviceId: string) => {
-        setRevoking(deviceId);
+    const runDeviceAction = async (deviceId: string, action: DeviceAction | "unblock") => {
+        setPending(deviceId);
         try {
-            await revokeDevice(deviceId);
+            if (action === "revoke") await revokeDevice(deviceId);
+            else if (action === "block") await blockDevice(deviceId);
+            else await unblockDevice(deviceId);
             await loadDevices();
             setShowConfirm(null);
         } catch (error) {
-            console.error("Failed to revoke device:", error);
+            console.error(`Failed to ${action} device:`, error);
         } finally {
-            setRevoking(null);
+            setPending(null);
         }
     };
 
@@ -99,6 +103,11 @@ export default function DeviceManagement() {
                                                     Current Device
                                                 </span>
                                             )}
+                                            {device.is_blocked && (
+                                                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full">
+                                                    Blocked
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-slate-400 text-sm mt-1">
                                             Last active: {formatDate(device.last_login)}
@@ -108,15 +117,29 @@ export default function DeviceManagement() {
 
                                 {!device.isCurrent && (
                                     <div>
-                                        {showConfirm === device.id ? (
+                                        {device.is_blocked ? (
+                                            <button
+                                                onClick={() => runDeviceAction(device.id, "unblock")}
+                                                disabled={pending === device.id}
+                                                className="text-slate-300 hover:text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                            >
+                                                {pending === device.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    "Unblock"
+                                                )}
+                                            </button>
+                                        ) : showConfirm?.id === device.id ? (
                                             <div className="flex items-center gap-2">
                                                 <button
-                                                    onClick={() => handleRevoke(device.id)}
-                                                    disabled={revoking === device.id}
+                                                    onClick={() => runDeviceAction(device.id, showConfirm.action)}
+                                                    disabled={pending === device.id}
                                                     className="bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
                                                 >
-                                                    {revoking === device.id ? (
+                                                    {pending === device.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : showConfirm.action === "block" ? (
+                                                        "Confirm block"
                                                     ) : (
                                                         "Confirm"
                                                     )}
@@ -129,13 +152,24 @@ export default function DeviceManagement() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <button
-                                                onClick={() => setShowConfirm(device.id)}
-                                                className="text-red-400 hover:text-red-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                                Revoke
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => setShowConfirm({ id: device.id, action: "revoke" })}
+                                                    className="text-red-400 hover:text-red-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                                    title="Sign this device out. It can log in again."
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    Revoke
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowConfirm({ id: device.id, action: "block" })}
+                                                    className="text-red-400 hover:text-red-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                                    title="Sign this device out and stop it logging in to this account."
+                                                >
+                                                    <Ban className="w-4 h-4" />
+                                                    Block
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -151,8 +185,8 @@ export default function DeviceManagement() {
                     <div className="text-sm">
                         <p className="text-blue-400 font-semibold mb-1">Security Tip</p>
                         <p className="text-blue-300/90 leading-relaxed">
-                            Regularly review your active devices and revoke access from any
-                            devices you no longer use or recognize.
+                            Regularly review your active devices. Revoke devices you no longer
+                            use, and block any you don't recognize - then change your master password.
                         </p>
                     </div>
                 </div>

@@ -15,6 +15,10 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn()
 }));
 
+vi.mock('./networkProbe', () => ({
+  isServerReachable: vi.fn().mockResolvedValue(true)
+}));
+
 describe('authService - Session Isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,4 +68,5 @@ describe('authService - Session Isolation', () => {
       expect(invoke).not.toHaveBeenCalledWith('clear_local_auth_cache');
     });
   });
+
 });

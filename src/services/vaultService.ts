@@ -46,7 +46,7 @@ export async function syncOfflineVault(): Promise<void> {
         syncRequested = true;
         return;
     }
-    
+
     isSyncing = true;
     window.dispatchEvent(new Event('sync-start'));
     const userId = getActiveUserEmail();
@@ -57,7 +57,7 @@ export async function syncOfflineVault(): Promise<void> {
             const pendingItems: SyncQueueItem[] = await invoke("get_pending_sync_queue", { userId });
 
             if (pendingItems.length === 0) break;
-            
+
             console.log(`Syncing ${pendingItems.length} offline changes...`);
 
             for (const item of pendingItems) {
@@ -70,19 +70,30 @@ export async function syncOfflineVault(): Promise<void> {
 
                 try {
                     if (item.sync_status === 'pending_delete') {
-                        await apiClient.delete(`/api/vault/${item.id}`);
+                        try {
+                            await apiClient.delete(`/api/vault/${item.id}`);
+                        } catch (delErr: unknown) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const status = (delErr as any)?.response?.status;
+                            if (status !== 404) {
+                                throw delErr;
+                            }
+                        }
                         await invoke("mark_deleted_local", { id: item.id, hardDelete: true });
                     } else {
                         const payload = {
                             id: item.id,
                             encrypted_data: item.encrypted_data,
                             nonce: item.nonce,
-                            version: item.version,
+                            version: item.sync_status === 'pending_insert' ? 0 : item.version,
                             record_type: item.record_type,
                         };
-                        
-                        await apiClient.post("/api/vault", payload);
-                        await invoke("mark_synced_local", { id: item.id });
+
+                        const response = await apiClient.post("/api/vault", payload);
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const resData = response.data as any;
+                        const serverVersion = resData?.item?.version ?? resData?.data?.version ?? resData?.version;
+                        await invoke("mark_synced_local", { id: item.id, newVersion: serverVersion });
                     }
                 } catch (err: unknown) {
                     const error = err as { message?: string; response?: { status?: number } };
@@ -115,7 +126,7 @@ export async function syncOfflineVault(): Promise<void> {
                         serverCombined.set(serverNonceBytes);
                         serverCombined.set(serverCipherBytes, serverNonceBytes.length);
                         const serverCombinedB64 = btoa(String.fromCharCode(...serverCombined));
-                        
+
                         // Decrypt server entry
                         const serverEntry = await invoke<VaultEntry>("decrypt_entry", { blobB64: serverCombinedB64 });
 
@@ -138,13 +149,13 @@ export async function syncOfflineVault(): Promise<void> {
                             // Re-submit the sync request with version = server_version + 1
                             const localPayload = {
                                 id: item.id,
-                                encrypted_data: item.encrypted_data, 
+                                encrypted_data: item.encrypted_data,
                                 nonce: item.nonce,
                                 version: newVersion,
                                 record_type: item.record_type,
                             };
                             await apiClient.post("/api/vault", localPayload);
-                            
+
                             // Update local DB to reflect the new version
                             await invoke("upsert_local_vault_record", {
                                 payload: {
@@ -214,14 +225,14 @@ export async function fetchVault(): Promise<DecryptedVaultRecord[]> {
                 }
             });
         }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-         if (err.message === "Network Error" || err.code === "ERR_NETWORK" || !err.response || err.response?.status === 503) {
+        if (err.message === "Network Error" || err.code === "ERR_NETWORK" || !err.response || err.response?.status === 503) {
             console.warn("Offline mode: Fetching natively from Rust local_vault.");
-         } else {
+        } else {
             console.error("fetchVault backend error:", err);
             // Don't throw if we can still try to return local Rust data
-         }
+        }
     }
 
     try {
@@ -244,7 +255,7 @@ export async function saveEntry(
 ): Promise<void> {
     const userId = getActiveUserEmail();
     const id = existingId || crypto.randomUUID();
-    const activeVersion = version || 1;
+    const activeVersion = version ?? 1;
     const syncStatus = existingId ? 'pending_update' : 'pending_insert';
 
     try {
@@ -262,7 +273,7 @@ export async function saveEntry(
 
         // 2. Trigger async sync process
         syncOfflineVault().catch((e) => console.error("Sync failed:", e));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
         console.error("Local database error:", err);
         // Alert the user instead of unhandled promise rejection crashing React
@@ -278,6 +289,6 @@ export async function deleteEntry(id: string): Promise<void> {
     // 1. Rust logic ensures pending_delete sync status
     await invoke("mark_deleted_local", { id, hardDelete: false });
 
-    // 2. Trigger sync process
-    syncOfflineVault().catch(console.error);
+    // 2. Trigger sync process and await completion
+    await syncOfflineVault();
 }

@@ -73,9 +73,13 @@ pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
     }
 
     if count == 0 {
+        // Random per-install device ID, generated once and kept in local_config
+        // (which is never cleared on logout) so every login from this install
+        // reports the same device to the backend.
         let uuid_str = uuid::Uuid::new_v4().to_string();
         let os_name = std::env::consts::OS; // e.g., "linux"
         let username = whoami::username().unwrap_or_else(|_| "UnknownUser".to_string());
+
         let device_name = format!("{}/{}", os_name, username);
         conn.execute(
             "INSERT INTO local_config (key, value) VALUES ('device_id', ?1)",
@@ -135,14 +139,29 @@ pub fn upsert_local_vault_record(
     vault_state: State<'_, Mutex<VaultState>>,
     payload: UpsertRecordPayload,
 ) -> Result<(), String> {
-    let (final_encrypted_data, final_nonce) =
+    let (final_nonce, final_encrypted_data) =
         match (payload.entry, payload.encrypted_data, payload.nonce) {
             (Some(entry), _, _) => {
                 let st = vault_state.lock().map_err(|_| "VaultState corrupted")?;
                 let blob_b64 = crate::commands::entry::encrypt_entry_logic(&st, &entry)?;
-                split_blob(&blob_b64)?
+                let result = split_blob(&blob_b64)?;
+                eprintln!(
+                    "[upsert] entry path -> nonce_len={} enc_data_len={}",
+                    result.0.len(),
+                    result.1.len()
+                );
+                result
             }
-            (None, Some(enc_data), Some(nonce)) => (enc_data, nonce),
+            // Pass-through: caller already has split fields from the server.
+            // Must return (nonce, enc_data) to match (final_nonce, final_encrypted_data).
+            (None, Some(enc_data), Some(nonce)) => {
+                eprintln!(
+                    "[upsert] passthrough path -> nonce_len={} enc_data_len={}",
+                    nonce.len(),
+                    enc_data.len()
+                );
+                (nonce, enc_data)
+            }
             _ => {
                 return Err(
                     "Invalid payload: must provide either entry or encrypted_data + nonce".into(),
@@ -207,18 +226,28 @@ pub fn fetch_vault_local(
     let mut decrypted_vault = Vec::new();
 
     for (id, encrypted_data, nonce, version, sync_status, record_type) in rows.flatten() {
-        // 2. Decrypt entirely in Rust RAM. Send plaintext to frontend over IPC.
-        if let Ok(blob_b64) = combine_blob(&nonce, &encrypted_data) {
-            if let Ok(plaintext_entry) = crate::commands::entry::decrypt_entry_logic(&st, &blob_b64)
-            {
-                decrypted_vault.push(VaultRecord {
-                    id,
-                    entry: plaintext_entry,
-                    version,
-                    sync_status,
-                    record_type,
-                });
-            }
+        eprintln!(
+            "[fetch] id={} nonce_len={} enc_data_len={}",
+            &id[..8],
+            nonce.len(),
+            encrypted_data.len()
+        );
+        // Decrypt entirely in Rust RAM. Send plaintext to frontend over IPC.
+        match combine_blob(&nonce, &encrypted_data) {
+            Ok(blob_b64) => match crate::commands::entry::decrypt_entry_logic(&st, &blob_b64) {
+                Ok(plaintext_entry) => {
+                    eprintln!("[fetch] id={} decrypt OK", &id[..8]);
+                    decrypted_vault.push(VaultRecord {
+                        id,
+                        entry: plaintext_entry,
+                        version,
+                        sync_status,
+                        record_type,
+                    });
+                }
+                Err(e) => eprintln!("[fetch] id={} decrypt FAILED: {}", &id[..8], e),
+            },
+            Err(e) => eprintln!("[fetch] id={} combine_blob FAILED: {}", &id[..8], e),
         }
     }
 
@@ -279,13 +308,25 @@ pub fn get_pending_sync_queue(
 }
 
 #[command]
-pub fn mark_synced_local(state: State<'_, DbState>, id: String) -> Result<(), String> {
+pub fn mark_synced_local(
+    state: State<'_, DbState>,
+    id: String,
+    new_version: Option<i64>,
+) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|_| "DbState corrupted")?;
-    conn.execute(
-        "UPDATE local_vault SET sync_status = 'synced' WHERE id = ?1",
-        params![id],
-    )
-    .map_err(|e| e.to_string())?;
+    if let Some(v) = new_version {
+        conn.execute(
+            "UPDATE local_vault SET sync_status = 'synced', version = ?2 WHERE id = ?1",
+            params![id, v],
+        )
+        .map_err(|e| e.to_string())?;
+    } else {
+        conn.execute(
+            "UPDATE local_vault SET sync_status = 'synced' WHERE id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
