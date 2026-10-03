@@ -91,6 +91,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
     return () => {
       unregisterSensitiveStateCallback(clearPassword);
       clearPassword();
+      authService.cancelMfaLogin();
     };
   }, []);
 
@@ -161,10 +162,21 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
 
     setLoading(true);
     try {
-      if (useBackupCode) {
-        await totpService.redeemBackupCode(mfaCode);
-      } else {
-        await totpService.verifyLogin(mfaCode);
+      const mfaResult = useBackupCode
+        ? await totpService.redeemBackupCode(mfaCode)
+        : await totpService.verifyLogin(mfaCode);
+
+      // The code was right: unlock the vault with the key it returned
+      try {
+        await authService.completeMfaLogin(mfaResult);
+      } catch (unlockErr) {
+        console.error("Vault unlock after MFA failed:", unlockErr);
+        // Don't leave a signed-in session behind a locked vault
+        await authService.logout();
+        setMfaRequired(false);
+        setMfaCode("");
+        notifyError("Could not unlock your vault. Please log in again.");
+        return;
       }
 
       // MFA complete - save email and navigate to vault
@@ -376,6 +388,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                 <br />
                 <button
                   onClick={() => {
+                    authService.cancelMfaLogin();
                     setMfaRequired(false);
                     setMfaCode("");
                   }}
