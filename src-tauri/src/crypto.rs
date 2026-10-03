@@ -91,28 +91,26 @@ pub fn derive_keys_from_kek(kek: &[u8]) -> (Zeroizing<[u8; 32]>, Zeroizing<[u8; 
     (auth_key, enc_key)
 }
 
-/// Hashes the recovery key using Argon2id with consistent security parameters
-/// Used for client-side hashing before sending to server during recovery
+/// Derives the recovery verifier sent to the server at registration and recovery.
 ///
-/// Uses the same security parameters as derive_kek() for consistency
+/// The recovery key is the raw MEK (base64) and must never leave the device.
+/// The server only needs to check that the same key is presented again, so it
+/// gets a one-way, domain-separated BLAKE3 derivation of it: 64 hex characters.
+///
+/// This must be deterministic - the value sent during recovery has to equal the
+/// one sent at registration, so no random salt. The MEK is 256 random bits, so
+/// a fast hash is enough here; the server stores an Argon2id hash of the verifier.
 pub fn hash_recovery_key(recovery_key: &str) -> Result<String, String> {
-    let argon2 = argon2::Argon2::new(
-        argon2::Algorithm::Argon2id,
-        argon2::Version::V0x13,
-        get_argon2_params(),
+    let mek = Zeroizing::new(
+        general_purpose::STANDARD
+            .decode(recovery_key.trim())
+            .map_err(|_| "Invalid recovery key: not valid base64")?,
     );
 
-    // Generate random salt bytes manually
-    let mut salt_bytes = [0u8; 16];
-    OsRng
-        .try_fill_bytes(&mut salt_bytes)
-        .map_err(|e| format!("Failed to generate salt: {}", e))?;
-    let salt_b64 = general_purpose::STANDARD_NO_PAD.encode(salt_bytes);
-    let salt = Salt::from_b64(&salt_b64).map_err(|e| format!("Invalid salt encoding: {}", e))?;
+    if mek.len() != 32 {
+        return Err("Invalid recovery key: wrong length".into());
+    }
 
-    let password_hash = argon2
-        .hash_password(recovery_key.as_bytes(), salt)
-        .map_err(|e| format!("Argon2 hashing failed: {}", e))?;
-
-    Ok(password_hash.to_string())
+    let verifier = blake3::derive_key("passwordpal_recovery_verifier_v1", &mek);
+    Ok(hex::encode(verifier))
 }

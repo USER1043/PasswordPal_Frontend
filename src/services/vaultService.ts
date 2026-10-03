@@ -145,16 +145,17 @@ export async function syncOfflineVault(): Promise<void> {
 
                         // 5. Resolution Logic
                         if (choice === 'local') {
-                            const newVersion = serverRecord.version + 1;
-                            // Re-submit the sync request with version = server_version + 1
+                            // Re-submit against the version the server has now. The server only
+                            // accepts an update whose version equals the stored one, then increments it.
                             const localPayload = {
                                 id: item.id,
                                 encrypted_data: item.encrypted_data,
                                 nonce: item.nonce,
-                                version: newVersion,
+                                version: serverRecord.version,
                                 record_type: item.record_type,
                             };
-                            await apiClient.post("/api/vault", localPayload);
+                            const resolved = await apiClient.post("/api/vault", localPayload);
+                            const newVersion: number = resolved.data?.item?.version ?? serverRecord.version + 1;
 
                             // Update local DB to reflect the new version
                             await invoke("upsert_local_vault_record", {

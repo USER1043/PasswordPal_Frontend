@@ -78,7 +78,7 @@ export default function SettingsPage({ onNavigate, userEmail = "" }: SettingsPag
             {/* Tab Content */}
             {activeTab === "security" && <SecurityTab notifyError={notifyError} success={success} userEmail={userEmail} />}
             {activeTab === "devices" && <DeviceManagement />}
-            {activeTab === "account" && <AccountTab onNavigate={onNavigate} notifyError={notifyError} success={success} />}
+            {activeTab === "account" && <AccountTab onNavigate={onNavigate} notifyError={notifyError} success={success} userEmail={userEmail} />}
         </div>
     );
 }
@@ -242,11 +242,19 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
         }
         setChangePwdLoadingTracked(true);
         try {
-            await authService.changePassword(userEmail, oldPassword, newPassword);
-            success("Password changed successfully");
+            const { otherDevicesSignedOut } = await authService.changePassword(userEmail, oldPassword, newPassword);
+            success(otherDevicesSignedOut
+                ? "Password changed. Your other devices have been signed out."
+                : "Password changed, but your other devices could not be signed out. Revoke them from the Devices tab.");
             setShowPasswordChange(false);
-        } catch {
-            notifyError("Password change failed. Check your current password.");
+        } catch (err: unknown) {
+            // A wrong current password fails locally in Rust (thrown as a string) or with a 401
+            const status = (err as { response?: { status?: number } }).response?.status;
+            if (typeof err === "string" || status === 401) {
+                notifyError("Current password is incorrect.");
+            } else {
+                notifyError("Password change failed. Please try again.");
+            }
         } finally {
             setOldPassword("");
             setNewPassword("");
@@ -457,7 +465,7 @@ function SecurityTab({ notifyError, success, userEmail }: { notifyError: (msg: s
 // ============================================================================
 // Account Tab - Export, Delete Account
 // ============================================================================
-function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: string) => void; notifyError: (msg: string) => void; success: (msg: string) => void }) {
+function AccountTab({ onNavigate, notifyError, success, userEmail }: { onNavigate: (view: string) => void; notifyError: (msg: string) => void; success: (msg: string) => void; userEmail: string }) {
     const [exportLoading, setExportLoading] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -465,30 +473,64 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
     const [showReauthModal, setShowReauthModal] = useState(false);
     const [reauthPassword, setReauthPassword] = useState("");
     const [reauthLoading, setReauthLoading] = useState(false);
+    const [reauthError, setReauthError] = useState("");
     const [pendingAction, setPendingAction] = useState<"export" | "delete" | null>(null);
 
     // Re-authenticate for sensitive actions
+    const closeReauthModal = () => {
+        setShowReauthModal(false);
+        setReauthPassword("");
+        setReauthError("");
+        setPendingAction(null);
+    };
+
+    // Check the entered password. Returns an error message, or null if it is correct.
+    // The hashing runs off the main thread in Rust, so the UI stays live meanwhile.
+    const checkReauthPassword = async (): Promise<string | null> => {
+        try {
+            if (pendingAction === "export") {
+                // Local action: check against the hash cached on this device (works offline)
+                const matches = await authService.verifyPasswordLocally(userEmail, reauthPassword);
+                return matches ? null : "Incorrect password. Please try again.";
+            }
+            // Server action: prove the password to the server, which then allows it.
+            // Zero-knowledge: the password is hashed in Rust; only the derived hash is sent.
+            await authService.verifyPassword(userEmail, reauthPassword);
+            return null;
+        } catch (err: unknown) {
+            console.error("Re-authentication failed:", err);
+            const status = (err as { response?: { status?: number } }).response?.status;
+            return status === 401
+                ? "Incorrect password. Please try again."
+                : "Couldn't verify your password. Please try again.";
+        }
+    };
+
+    // Re-authenticate for sensitive actions
     const handleReauth = async () => {
+        if (reauthLoading) return; // Enter pressed again while already confirming
         if (!reauthPassword) {
-            notifyError("Please enter your password");
+            setReauthError("Please enter your master password.");
             return;
         }
+        setReauthError("");
         setReauthLoading(true);
-        try {
-            await apiClient.post("/auth/verify-password", { password: reauthPassword });
-            setShowReauthModal(false);
-            setReauthPassword("");
-            // Retry the pending action
-            if (pendingAction === "export") {
-                await doExport();
-            } else if (pendingAction === "delete") {
-                await doDelete();
-            }
-            setPendingAction(null);
-        } catch {
-            notifyError("Incorrect password");
-        } finally {
-            setReauthLoading(false);
+        const action = pendingAction;
+        const errorMessage = await checkReauthPassword();
+        setReauthLoading(false);
+
+        if (errorMessage) {
+            // Keep the prompt open so the user can retry
+            setReauthError(errorMessage);
+            return;
+        }
+
+        closeReauthModal();
+        success("Password confirmed");
+        if (action === "export") {
+            await doExport();
+        } else if (action === "delete") {
+            await doDelete();
         }
     };
 
@@ -535,18 +577,18 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
             success(`Exported ${items.length} passwords to CSV`);
         } catch (err: unknown) {
             console.error("Export failed:", err);
-            if ((err as { response?: { status?: number } }).response?.status === 403) {
-                setPendingAction("export");
-                setShowReauthModal(true);
-            } else {
-                notifyError("Export failed");
-            }
+            notifyError("Export failed");
         } finally {
             setExportLoading(false);
         }
     };
 
-    const handleExport = () => doExport();
+    // The export is built from data already decrypted on this device, so no
+    // server check can guard it. Always ask for the master password first.
+    const handleExport = () => {
+        setPendingAction("export");
+        setShowReauthModal(true);
+    };
 
     const doDelete = async () => {
         setDeleteLoading(true);
@@ -696,16 +738,25 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
                         <input
                             type="password"
                             value={reauthPassword}
-                            onChange={(e) => setReauthPassword(e.target.value)}
+                            onChange={(e) => { setReauthPassword(e.target.value); setReauthError(""); }}
                             onKeyDown={(e) => e.key === "Enter" && handleReauth()}
                             placeholder="Enter master password"
                             autoFocus
-                            className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4"
+                            readOnly={reauthLoading}
+                            className={`w-full bg-slate-900/50 border rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 ${reauthError ? "border-red-500/60" : "border-slate-600"} ${reauthLoading ? "opacity-50" : ""}`}
                         />
+                        {/* Result of the check: progress while hashing, or why it failed */}
+                        <p
+                            role="status"
+                            className={`text-sm min-h-5 mt-2 mb-4 ${reauthError ? "text-red-400" : "text-slate-400"}`}
+                        >
+                            {reauthLoading ? "Checking your password…" : reauthError}
+                        </p>
                         <div className="flex gap-3 justify-end">
                             <button
-                                onClick={() => { setShowReauthModal(false); setReauthPassword(""); setPendingAction(null); }}
-                                className="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-xl"
+                                onClick={closeReauthModal}
+                                disabled={reauthLoading}
+                                className="px-5 py-2.5 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-xl disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -715,7 +766,7 @@ function AccountTab({ onNavigate, notifyError, success }: { onNavigate: (view: s
                                 className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold disabled:opacity-50 flex items-center gap-2"
                             >
                                 {reauthLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                                Confirm
+                                {reauthLoading ? "Confirming…" : "Confirm"}
                             </button>
                         </div>
                     </div>
