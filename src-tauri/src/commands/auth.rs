@@ -282,13 +282,35 @@ pub struct RecoverVaultResponse {
     pub new_auth_hash: String,
 }
 
-/// Hash the recovery key using Argon2id with consistent security parameters
-/// This is called client-side before sending to server for zero-knowledge recovery
+/// The public key the server stores at registration so it can later verify a
+/// recovery signature. Derived from the recovery key, which never leaves the device.
 #[tauri::command]
-pub async fn hash_recovery_key_command(recovery_key: String) -> Result<String, String> {
+pub async fn recovery_public_key_command(recovery_key: String) -> Result<String, String> {
     run_blocking(move || {
         let recovery_key = Zeroizing::new(recovery_key);
-        crypto::hash_recovery_key(&recovery_key)
+        crypto::recovery_public_key(&recovery_key)
+    })
+    .await
+}
+
+/// Signs the server's recovery challenge together with the new credentials.
+#[tauri::command]
+pub async fn sign_recovery_request_command(
+    recovery_key: String,
+    challenge: String,
+    new_salt: String,
+    new_wrapped_mek: String,
+    new_auth_hash: String,
+) -> Result<String, String> {
+    run_blocking(move || {
+        let recovery_key = Zeroizing::new(recovery_key);
+        crypto::sign_recovery_request(
+            &recovery_key,
+            &challenge,
+            &new_salt,
+            &new_wrapped_mek,
+            &new_auth_hash,
+        )
     })
     .await
 }

@@ -223,3 +223,60 @@ describe('authService - Session Isolation', () => {
   });
 
 });
+
+describe('authService - recovery by signature', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // @ts-expect-error - Mocking invoke
+    invoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'recover_vault') return { new_salt: 'ns', new_wrapped_mek: 'nm', new_auth_hash: 'na' };
+      if (cmd === 'sign_recovery_request_command') return 'sig-hex';
+      if (cmd === 'recovery_public_key_command') return 'pub-hex';
+      if (cmd === 'register_vault') return { salt: 's', wrapped_mek: 'w', auth_hash: 'a', recovery_key: 'RECOVERY-KEY' };
+      return null;
+    });
+    // @ts-expect-error - Mocking apiClient post
+    apiClient.post.mockImplementation(async (url: string) =>
+      url === '/auth/recover/challenge' ? { data: { challenge: 'chal-1' } } : { data: {} });
+  });
+
+  it('registers with only the public key, never the recovery key or a fixed fingerprint', async () => {
+    await authService.register('a@b.c', 'pw');
+
+    const call = (apiClient.post as unknown as { mock: { calls: [string, Record<string, unknown>][] } })
+      .mock.calls.find(([url]) => url === '/auth/register');
+    expect(call?.[1].recovery_public_key).toBe('pub-hex');
+    expect(call?.[1]).not.toHaveProperty('recovery_key_hash');
+    expect(JSON.stringify(call?.[1])).not.toContain('RECOVERY-KEY');
+    expect(invoke).not.toHaveBeenCalledWith('hash_recovery_key_command', expect.anything());
+  });
+
+  it('signs the challenge together with the new values and sends the signature', async () => {
+    await authService.recoverAccount('a@b.c', '  RECOVERY-KEY \n', 'new-pass');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/recover/challenge', { email: 'a@b.c' });
+    expect(invoke).toHaveBeenCalledWith('sign_recovery_request_command', {
+      recoveryKey: 'RECOVERY-KEY', challenge: 'chal-1', newSalt: 'ns', newWrappedMek: 'nm', newAuthHash: 'na',
+    });
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/recover', {
+      email: 'a@b.c', challenge: 'chal-1', signature: 'sig-hex',
+      new_salt: 'ns', new_wrapped_mek: 'nm', new_auth_hash: 'na',
+    });
+  });
+
+  it('never sends the recovery key or a fixed fingerprint', async () => {
+    await authService.recoverAccount('a@b.c', 'RECOVERY-KEY', 'new-pass');
+
+    const sent = JSON.stringify((apiClient.post as unknown as { mock: { calls: unknown[] } }).mock.calls);
+    expect(sent).not.toContain('RECOVERY-KEY');
+    expect(sent).not.toContain('recovery_key_hash');
+  });
+
+  it('changes nothing locally if the challenge cannot be fetched', async () => {
+    // @ts-expect-error - Mocking apiClient post
+    apiClient.post.mockRejectedValueOnce({ response: { status: 500 } });
+
+    await expect(authService.recoverAccount('a@b.c', 'RECOVERY-KEY', 'new-pass')).rejects.toBeDefined();
+    expect(invoke).not.toHaveBeenCalledWith('recover_vault', expect.anything());
+  });
+});

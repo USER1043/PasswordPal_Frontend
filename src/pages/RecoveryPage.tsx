@@ -4,8 +4,7 @@
 import { useState, useEffect } from "react";
 import { Shield, Key, Eye, EyeOff, Loader2, AlertTriangle, Copy, CheckCircle } from "lucide-react";
 import { useNotification } from "../context/NotificationContext";
-import apiClient from "../api/axiosClient";
-import { invoke } from "@tauri-apps/api/core";
+import { authService } from "../services/authService";
 
 interface RecoveryPageProps {
     onNavigate: (view: string) => void;
@@ -53,32 +52,9 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
 
         setLoading(true);
         try {
-            // Re-wrap the existing MEK from the recovery key under the new password.
-            // This preserves the vault - no new MEK is generated.
-            const recoverData = await invoke<{
-                new_salt: string;
-                new_wrapped_mek: string;
-                new_auth_hash: string;
-            }>("recover_vault", {
-                recoveryKey: recoveryKey.trim(),
-                newPassword,
-            });
-
-            // SECURITY: the server must NEVER receive the raw MEK (recovery key). Derive the
-            // same one-way verifier that was sent at registration and send that instead.
-            const recoveryKeyHash = await invoke<string>("hash_recovery_key_command", {
-                recoveryKey: recoveryKey.trim(),
-            });
-
-            // Send new credentials to backend. Backend verifies the recovery key hash
-            // server-side before updating.
-            await apiClient.post("/auth/recover", {
-                email,
-                recovery_key_hash: recoveryKeyHash,  // verifier, not the raw key
-                new_salt: recoverData.new_salt,
-                new_wrapped_mek: recoverData.new_wrapped_mek,
-                new_auth_hash: recoverData.new_auth_hash,
-            });
+            // Re-wraps the existing vault key under the new password and proves possession
+            // of the recovery key with a signature; the key itself is never sent.
+            await authService.recoverAccount(email, recoveryKey, newPassword);
 
             // HIGH PRIORITY: Wipe raw key material from React state immediately on success
             setRecoveryKey("");
@@ -89,8 +65,11 @@ export default function RecoveryPage({ onNavigate }: RecoveryPageProps) {
         } catch (err: unknown) {
             console.error("Recovery error:", err);
             const status = (err as { response?: { status?: number } }).response?.status;
+            const code = (err as { response?: { data?: { code?: string } } }).response?.data?.code;
             if (status === 404) {
                 notifyError("Account not found or no recovery key on file");
+            } else if (code === "CHALLENGE_INVALID") {
+                notifyError("The recovery request expired. Please try again.");
             } else if (status === 401) {
                 notifyError("Invalid recovery key - please check and try again");
             } else {
