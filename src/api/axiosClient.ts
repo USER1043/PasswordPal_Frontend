@@ -10,17 +10,24 @@ export const SESSION_REVOKED_EVENT = "session-revoked";
 // We point to Vite's environment variable which we set to the Render backend url in production
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
-let cachedUserAgent: string | null = null;
+import { getPersistentDeviceIdentity } from "../services/deviceService";
 
-async function getUserAgent(): Promise<string> {
-  if (cachedUserAgent) return cachedUserAgent;
+let cachedUserAgent: string | null = null;
+let cachedDeviceId: string | null = null;
+
+async function getDeviceIdentityHeaders(): Promise<{ userAgent: string; deviceId: string }> {
+  if (cachedUserAgent && cachedDeviceId) {
+    return { userAgent: cachedUserAgent, deviceId: cachedDeviceId };
+  }
   try {
-    const identity = await invoke<{ device_id: string; device_name: string }>("get_local_identity");
-    cachedUserAgent = `${identity.device_name} (ID: ${identity.device_id})`;
+    const identity = await getPersistentDeviceIdentity();
+    cachedUserAgent = identity.device_name;
+    cachedDeviceId = identity.device_id;
   } catch {
     cachedUserAgent = navigator.userAgent;
+    cachedDeviceId = "";
   }
-  return cachedUserAgent;
+  return { userAgent: cachedUserAgent, deviceId: cachedDeviceId };
 }
 
 /** Wipe encryption keys from Rust memory */
@@ -67,10 +74,13 @@ async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promi
     headers["Content-Type"] = "application/json";
   }
 
-  // Tauri's native HTTP client does not automatically attach a User-Agent.
-  // We fetch the OS username natively via Rust to display cleaner User-Agents in Audit Logs.
+  const { userAgent, deviceId } = await getDeviceIdentityHeaders();
+
   if (!Object.keys(headers).some(k => k.toLowerCase() === "user-agent")) {
-    headers["User-Agent"] = await getUserAgent();
+    headers["User-Agent"] = userAgent;
+  }
+  if (deviceId && !Object.keys(headers).some(k => k.toLowerCase() === "x-device-id")) {
+    headers["X-Device-Id"] = deviceId;
   }
 
   const fetchOptions: Record<string, unknown> = {
@@ -115,7 +125,12 @@ async function tauriFetchAdapter(url: string, options: FetchOptions = {}): Promi
         if (!isRefreshing) {
           isRefreshing = true;
           try {
-            await fetch(`${BASE_URL}/auth/refresh`, { method: "POST" });
+            const refreshResponse = await fetch(`${BASE_URL}/auth/refresh`, { method: "POST" });
+            // 401 = refresh token expired, or this device was revoked/blocked.
+            // Other failures (e.g. 503 offline) are not treated as a logout.
+            if (refreshResponse.status === 401) {
+              throw new Error("Session revoked");
+            }
             isRefreshing = false;
             onRefreshed(true);
             return tauriFetchAdapter(url, options); // Retry original request

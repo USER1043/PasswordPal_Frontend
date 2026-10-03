@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import {
     Shield, CheckCircle2, XCircle, Clock, Monitor, Globe,
     ChevronLeft, ChevronRight, Loader2, RefreshCw, AlertTriangle,
+    Ban, LogOut, ShieldCheck,
 } from "lucide-react";
 import apiClient from "../api/axiosClient";
 import { isServerReachable } from "../services/networkProbe";
@@ -13,9 +14,24 @@ interface AuditLog {
     id: string;
     ip_address: string;
     was_successful: boolean;
-    user_agent: string | null;
+    failure_reason: "invalid_credentials" | "device_blocked" | null;
+    device_name: string;
     attempt_time: string;
 }
+
+interface DeviceEvent {
+    id: string;
+    action: "revoke" | "block" | "unblock";
+    target_device_name: string;
+    actor_device_name: string;
+    created_at: string;
+}
+
+const DEVICE_EVENT_DISPLAY = {
+    revoke: { label: "Revoked", icon: LogOut, color: "text-amber-400", bg: "bg-amber-500/10" },
+    block: { label: "Blocked", icon: Ban, color: "text-red-400", bg: "bg-red-500/10" },
+    unblock: { label: "Unblocked", icon: ShieldCheck, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+} as const;
 
 interface AuditLogPageProps {
     onNavigate: (view: string) => void;
@@ -26,6 +42,7 @@ const PAGE_SIZE = 20;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPageProps) {
     const [logs, setLogs] = useState<AuditLog[]>([]);
+    const [deviceEvents, setDeviceEvents] = useState<DeviceEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
     const [totalSuccess, setTotalSuccess] = useState(0);
@@ -49,6 +66,7 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
                 params: { limit: PAGE_SIZE.toString(), offset: (pageNum * PAGE_SIZE).toString() },
             });
             setLogs(response.data.logs);
+            setDeviceEvents(response.data.device_events ?? []);
             setTotal(response.data.total);
             setTotalSuccess(response.data.total_success ?? 0);
             setTotalFailed(response.data.total_failed ?? 0);
@@ -66,8 +84,7 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
-    const parseUserAgent = (ua: string | null): string => {
-        if (!ua) return "Unknown Device";
+    const parseUserAgent = (ua: string): string => {
         if (ua.includes("Windows")) return "Windows";
         if (ua.includes("Mac")) return "macOS";
         if (ua.includes("Linux")) return "Linux";
@@ -76,15 +93,18 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
         return "Unknown";
     };
 
-    const getBrowserFromUA = (ua: string | null): string => {
-        if (!ua) return "Unknown Browser";
+    const getBrowserFromUA = (ua: string): string => {
         if (ua.includes("Edg/")) return "Edge";
         if (ua.includes("Chrome/")) return "Chrome";
         if (ua.includes("Firefox/")) return "Firefox";
         if (ua.includes("Safari/") && !ua.includes("Chrome")) return "Safari";
-        if (ua.includes("tauri") || ua.includes("Tauri")) return "PasswordPal Desktop";
         return "Unknown Browser";
     };
+
+    // The app reports its own device name (e.g. "linux/alice"); show that as is.
+    // Only a raw browser User-Agent string needs summarising.
+    const describeDevice = (name: string): string =>
+        name.includes("Mozilla/") ? `${parseUserAgent(name)} · ${getBrowserFromUA(name)}` : name;
 
     const formatTime = (iso: string) => {
         const d = new Date(iso);
@@ -165,7 +185,52 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
                 </div>
             )}
 
+            {/* Device Activity - revoke / block / unblock history */}
+            {deviceEvents.length > 0 && (
+                <div>
+                    <h2 className="text-slate-300 text-sm font-semibold mb-2">Device Activity</h2>
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl overflow-hidden divide-y divide-slate-700/50">
+                        {deviceEvents.map((event) => {
+                            const display = DEVICE_EVENT_DISPLAY[event.action];
+                            const EventIcon = display.icon;
+                            return (
+                                <div
+                                    key={event.id}
+                                    className="flex items-center justify-between px-5 py-4 hover:bg-slate-700/20 transition-colors"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-2 rounded-lg ${display.bg}`}>
+                                            <EventIcon className={`w-5 h-5 ${display.color}`} />
+                                        </div>
+                                        <div>
+                                            <p className="text-white font-medium text-sm">
+                                                {display.label} {describeDevice(event.target_device_name)}
+                                            </p>
+                                            <span className="flex items-center gap-1 text-slate-500 text-xs mt-1">
+                                                <Monitor className="w-3.5 h-3.5" />
+                                                From {describeDevice(event.actor_device_name)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-slate-400 text-sm">{formatTime(event.created_at)}</p>
+                                        <p className="text-slate-600 text-xs mt-0.5">
+                                            {new Date(event.created_at).toLocaleTimeString("en-US", {
+                                                hour: "2-digit", minute: "2-digit",
+                                            })}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Log Entries */}
+            {deviceEvents.length > 0 && (
+                <h2 className="text-slate-300 text-sm font-semibold -mb-4">Login History</h2>
+            )}
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
@@ -191,6 +256,8 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
                                         }`}>
                                         {log.was_successful ? (
                                             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                        ) : log.failure_reason === "device_blocked" ? (
+                                            <Ban className="w-5 h-5 text-red-400" />
                                         ) : (
                                             <XCircle className="w-5 h-5 text-red-400" />
                                         )}
@@ -199,12 +266,16 @@ export default function AuditLogPage({ onNavigate: _onNavigate }: AuditLogPagePr
                                     {/* Details */}
                                     <div>
                                         <p className="text-white font-medium text-sm">
-                                            {log.was_successful ? "Successful Login" : "Failed Login Attempt"}
+                                            {log.was_successful
+                                                ? "Successful Login"
+                                                : log.failure_reason === "device_blocked"
+                                                    ? "Login Blocked - Device Is Blocked"
+                                                    : "Failed Login Attempt"}
                                         </p>
                                         <div className="flex items-center gap-3 mt-1">
                                             <span className="flex items-center gap-1 text-slate-500 text-xs">
                                                 <Monitor className="w-3.5 h-3.5" />
-                                                {parseUserAgent(log.user_agent)} · {getBrowserFromUA(log.user_agent)}
+                                                {describeDevice(log.device_name)}
                                             </span>
                                             <span className="flex items-center gap-1 text-slate-500 text-xs">
                                                 <Globe className="w-3.5 h-3.5" />

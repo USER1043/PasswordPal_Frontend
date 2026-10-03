@@ -73,6 +73,9 @@ pub fn init_db(app_handle: &AppHandle) -> SqlResult<Connection> {
     }
 
     if count == 0 {
+        // Random per-install device ID, generated once and kept in local_config
+        // (which is never cleared on logout) so every login from this install
+        // reports the same device to the backend.
         let uuid_str = uuid::Uuid::new_v4().to_string();
         let os_name = std::env::consts::OS; // e.g., "linux"
         let username = whoami::username().unwrap_or_else(|_| "UnknownUser".to_string());

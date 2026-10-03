@@ -41,13 +41,9 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
     );
   };
 
-  it('generates a fresh device UUID on login and passes it to authService.login', async () => {
+  it('calls authService.login with credentials on submit', async () => {
     // @ts-expect-error - Mocking login result which is partially typed here
     authService.login.mockResolvedValueOnce({ success: true, mfa_required: false });
-
-    // Mock randomUUID to ensure we can assert against a predictable value
-    const expectedUuid = '12345678-1234-1234-1234-123456789012';
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue(expectedUuid);
 
     renderComponent();
 
@@ -63,11 +59,10 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      // Assert authService.login was called with email, password, AND the fresh deviceFingerprint
+      // Assert authService.login was called with email and password
       expect(authService.login).toHaveBeenCalledWith(
         'test@example.com',
-        'securepassword123',
-        expectedUuid
+        'securepassword123'
       );
     });
   });

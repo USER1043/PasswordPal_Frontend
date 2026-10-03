@@ -33,6 +33,12 @@ interface LoginPageProps {
   onLoginSuccess?: (email: string) => void;
 }
 
+const DEVICE_BLOCKED_MESSAGE = "This device has been blocked from this account.";
+
+function isDeviceBlocked(err: unknown): boolean {
+  return (err as { response?: { data?: { code?: string } } }).response?.data?.code === "DEVICE_BLOCKED";
+}
+
 export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -96,10 +102,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
 
     setLoading(true);
     try {
-      // Generate a fresh, isolated device fingerprint purely for this specific login attempt
-      const deviceId = crypto.randomUUID();
-
-      const result = await authService.login(email, password, deviceId);
+      const result = await authService.login(email, password);
 
       if (result.mfa_required) {
         setMfaRequired(true);
@@ -134,7 +137,9 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
 
       // Handle Backend HTTP errors
       const status = (err as { response?: { status?: number } }).response?.status;
-      if (status === 404 || status === 401) {
+      if (isDeviceBlocked(err)) {
+        notifyError(DEVICE_BLOCKED_MESSAGE);
+      } else if (status === 404 || status === 401) {
         notifyError("Email or password incorrect");
       } else if (status === 429) {
         notifyError("Too many login attempts. Please wait.");
@@ -169,7 +174,11 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       onNavigate("vault");
     } catch (err: unknown) {
       console.error("MFA Error:", err);
-      notifyError(useBackupCode ? "Invalid backup code" : "Invalid authentication code");
+      if (isDeviceBlocked(err)) {
+        notifyError(DEVICE_BLOCKED_MESSAGE);
+      } else {
+        notifyError(useBackupCode ? "Invalid backup code" : "Invalid authentication code");
+      }
     } finally {
       setLoading(false);
     }
