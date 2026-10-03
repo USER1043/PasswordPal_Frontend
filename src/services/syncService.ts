@@ -3,7 +3,27 @@
 // ============================================================================
 import apiClient from "../api/axiosClient";
 import { invoke } from "@tauri-apps/api/core";
-import type { VaultEntry, VaultRecord, DecryptedVaultItem } from "./vaultService";
+import type { VaultEntry } from "./vaultService";
+
+/** An encrypted vault record as returned by the sync endpoint. */
+export interface VaultRecord {
+    id: string;
+    encrypted_data: string;
+    nonce: string;
+    version: number;
+    record_type: string;
+    created_at: string;
+    updated_at: string;
+}
+
+/** A pulled record after decryption: the entry's fields plus its sync metadata. */
+export interface DecryptedVaultItem extends VaultEntry {
+    id: string;
+    version: number;
+    record_type: string;
+    created_at: string;
+    updated_at: string;
+}
 
 export interface SyncPullResponse {
     records: VaultRecord[];
@@ -64,7 +84,6 @@ export async function pullChanges(
                 id: record.id,
                 version: record.version,
                 record_type: record.record_type,
-                client_record_id: record.client_record_id,
                 created_at: record.created_at,
                 updated_at: record.updated_at,
             });
@@ -84,7 +103,6 @@ export async function pushChange(
     recordId?: string,
     version?: number,
     recordType: string = "credential",
-    clientRecordId?: string,
     isDeleted: boolean = false
 ): Promise<{ success: boolean; conflict?: SyncConflict }> {
     const blobB64 = await invoke<string>("encrypt_entry", { entry });
@@ -99,7 +117,6 @@ export async function pushChange(
 
     if (recordId) payload.id = recordId;
     if (version !== undefined) payload.client_known_version = version;
-    if (clientRecordId) payload.client_record_id = clientRecordId;
 
     try {
         await apiClient.post("/api/vault/sync", { records: [payload] });
