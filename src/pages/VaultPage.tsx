@@ -81,8 +81,9 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
     loadVault();
   }, [loadVault]);
 
-  // Derive folders dynamically from actual data
+  // Derive folders and usernames dynamically from actual data
   const folderNames = [...new Set(passwords.map((p) => p.folder).filter(Boolean))] as string[];
+  const existingUsernames = [...new Set(passwords.map((p) => p.username).filter(Boolean))] as string[];
   const folders = [
     { id: "all", name: "All Items", count: passwords.length, icon: "🔐" },
     ...folderNames.map((f) => ({
@@ -143,12 +144,14 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this password?")) return;
     try {
+      setPasswords((prev) => prev.filter((p) => p.id !== id));
       await vaultService.deleteEntry(id);
       success("Password deleted");
       await loadVault();
     } catch (err) {
       console.error("Delete failed:", err);
       notifyError("Failed to delete password");
+      await loadVault();
     }
   };
 
@@ -366,6 +369,8 @@ export default function VaultPage({ onNavigate, showAddModal, setShowAddModal }:
         }}
         onSave={handleSavePassword}
         editData={editingPassword}
+        existingFolders={folderNames}
+        existingUsernames={existingUsernames}
       />
     </div>
   );
