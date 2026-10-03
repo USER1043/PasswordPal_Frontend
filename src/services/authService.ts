@@ -91,8 +91,9 @@ export const authService = {
             password: masterPassword,
         });
 
-        // SECURITY: Hash recovery key using Argon2id with consistent security parameters
-        // Memory (m): 64 MiB, Time/Iterations (t): 3 passes, Parallelism (p): 4 lanes/threads
+        // SECURITY: the recovery key (raw MEK) never leaves the device. The server gets a
+        // one-way verifier derived from it in Rust - the same value every time, so it can
+        // be matched again during recovery.
         const recoveryKeyHash = await invoke<string>("hash_recovery_key_command", {
             recoveryKey: verifyKeys.recovery_key,
         });
@@ -294,18 +295,55 @@ export const authService = {
      * Verify password for sensitive actions (step-up auth)
      */
     async verifyPassword(email: string, masterPassword: string): Promise<void> {
-        const { salt, wrapped_mek } = await this.getParams(email);
+        const { salt } = await this.getParams(email);
 
-        const loginData = await invoke<LoginResponse>("login_vault", {
+        // Only the derived hash leaves the device, never the password
+        const authHash = await invoke<string>("derive_auth_hash", {
             password: masterPassword,
             salt,
-            wrappedMek: wrapped_mek,
         });
 
         await apiClient.post("/auth/verify-password", {
             email,
-            auth_hash: loginData.auth_hash,
+            auth_hash: authHash,
         });
+    },
+
+    /**
+     * Unlock the vault again after auto-lock, using the wrapped MEK cached on
+     * this device at login. Purely local: the server never hands out the wrapped
+     * MEK before authentication (/auth/params returns only the salt), and the
+     * session itself is still valid. Rejects if the password is wrong.
+     */
+    async unlockVault(email: string, masterPassword: string): Promise<void> {
+        const cached = await invoke<{ salt: string; wrapped_mek: string } | null>("get_cached_auth_params", { email });
+        if (!cached?.wrapped_mek) {
+            throw new Error("No local vault key found. Log out and log in again.");
+        }
+
+        await invoke<LoginResponse>("login_vault", {
+            password: masterPassword,
+            salt: cached.salt,
+            wrappedMek: cached.wrapped_mek,
+        });
+    },
+
+    /**
+     * Check the master password on this device only, against the hash cached at
+     * login. For guarding local actions (e.g. exporting decrypted data); works offline.
+     */
+    async verifyPasswordLocally(email: string, masterPassword: string): Promise<boolean> {
+        const cached = await invoke<{ salt: string; local_password_hash: string } | null>("get_cached_auth_params", { email });
+        if (!cached?.local_password_hash) {
+            throw new Error("No local login data found. Log out, log in again and retry.");
+        }
+
+        const authHash = await invoke<string>("derive_auth_hash", {
+            password: masterPassword,
+            salt: cached.salt,
+        });
+
+        return authHash === cached.local_password_hash;
     },
 
     /**
@@ -315,8 +353,20 @@ export const authService = {
         email: string,
         oldPassword: string,
         newPassword: string
-    ): Promise<void> {
-        const { salt, wrapped_mek } = await this.getParams(email);
+    ): Promise<{ otherDevicesSignedOut: boolean }> {
+        // The server never hands out the wrapped MEK before authentication, so
+        // /auth/params returns only the salt. Use the copy cached at login.
+        const cached = await invoke<{ salt: string; wrapped_mek: string } | null>("get_cached_auth_params", { email });
+        if (!cached?.wrapped_mek) {
+            throw new Error("No local vault key found. Log out, log in again and retry.");
+        }
+        const { salt, wrapped_mek } = cached;
+
+        // The server requires proof of the current password before replacing it
+        const currentAuthHash = await invoke<string>("derive_auth_hash", {
+            password: oldPassword,
+            salt,
+        });
 
         const newWrappedMek = await invoke<string>("change_password_optimization", {
             encryptedMekBlob: wrapped_mek,
@@ -332,11 +382,19 @@ export const authService = {
             wrappedMek: newWrappedMek,
         });
 
-        // Update server with new wrapped MEK and auth hash
-        await apiClient.post("/auth/change-password", {
+        // Update server with new wrapped MEK and auth hash.
+        // On success the server signs out every other device.
+        const response = await apiClient.post("/auth/change-password", {
             salt,
             wrapped_mek: newWrappedMek,
             auth_hash: loginData.auth_hash,
-        });
+            current_auth_hash: currentAuthHash,
+        }) as ApiResponse<{ other_devices_signed_out?: boolean }>;
+
+        // Keep the local cache in step, so offline login and the next password
+        // change use the new wrapped MEK and hash.
+        await cacheAuthParams(email, salt, newWrappedMek, loginData.auth_hash);
+
+        return { otherDevicesSignedOut: response.data?.other_devices_signed_out !== false };
     },
 };

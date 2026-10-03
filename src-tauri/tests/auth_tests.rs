@@ -9,8 +9,10 @@ use aes_gcm::{
 use base64::{engine::general_purpose, Engine as _};
 use common::{derive_test_key, get_test_salt, get_test_salt_b64};
 use passwordpal_lib::commands::auth::{
-    change_password_optimization, derive_auth_hash_logic, login_vault_logic, register_vault_logic,
+    change_password_optimization_logic, derive_auth_hash_logic, login_vault_logic,
+    register_vault_logic,
 };
+use passwordpal_lib::crypto::hash_recovery_key;
 use zeroize::Zeroizing;
 
 /// Helper to create a wrapped MEK with a given password
@@ -52,7 +54,7 @@ fn test_change_password_success() {
     let wrapped_b64 = create_wrapped_mek(old_password, &salt_bytes, &raw_mek);
 
     // 3. Call Function
-    let result = change_password_optimization(
+    let result = change_password_optimization_logic(
         wrapped_b64,
         old_password.into(),
         new_password.into(),
@@ -96,7 +98,7 @@ fn test_change_password_invalid_old_password() {
     let wrapped_b64 = create_wrapped_mek(old_password, &salt_bytes, &raw_mek);
 
     // Try to change with wrong old password
-    let result = change_password_optimization(
+    let result = change_password_optimization_logic(
         wrapped_b64,
         wrong_password.into(),
         new_password.into(),
@@ -109,7 +111,7 @@ fn test_change_password_invalid_old_password() {
 
 #[test]
 fn test_change_password_invalid_base64_blob() {
-    let result = change_password_optimization(
+    let result = change_password_optimization_logic(
         "!!!invalid_base64!!!".into(),
         "old_password".into(),
         "new_password".into(),
@@ -129,7 +131,7 @@ fn test_change_password_invalid_salt() {
 
     let wrapped_b64 = create_wrapped_mek(old_password, &salt_bytes, &raw_mek);
 
-    let result = change_password_optimization(
+    let result = change_password_optimization_logic(
         wrapped_b64,
         old_password.into(),
         new_password.into(),
@@ -145,7 +147,7 @@ fn test_change_password_blob_too_short() {
     // Create a blob that's too short (less than 12 bytes)
     let short_blob = general_purpose::STANDARD.encode(b"short");
 
-    let result = change_password_optimization(
+    let result = change_password_optimization_logic(
         short_blob,
         "old_password".into(),
         "new_password".into(),
@@ -169,7 +171,7 @@ fn test_change_password_multiple_times() {
     let wrapped1 = create_wrapped_mek(password1, &salt_bytes, &raw_mek);
 
     // Change to password2
-    let result2 = change_password_optimization(
+    let result2 = change_password_optimization_logic(
         wrapped1,
         password1.into(),
         password2.into(),
@@ -179,7 +181,7 @@ fn test_change_password_multiple_times() {
     let wrapped2 = result2.unwrap();
 
     // Change to password3
-    let result3 = change_password_optimization(
+    let result3 = change_password_optimization_logic(
         wrapped2,
         password2.into(),
         password3.into(),
@@ -215,7 +217,7 @@ fn test_change_password_with_special_characters() {
 
     let wrapped_b64 = create_wrapped_mek(old_password, &salt_bytes, &raw_mek);
 
-    let result = change_password_optimization(
+    let result = change_password_optimization_logic(
         wrapped_b64,
         old_password.into(),
         new_password.into(),
@@ -251,7 +253,7 @@ fn test_change_password_empty_passwords() {
     let wrapped_b64 = create_wrapped_mek("", &salt_bytes, &raw_mek);
 
     let result =
-        change_password_optimization(wrapped_b64, "".into(), "new_password".into(), salt_b64);
+        change_password_optimization_logic(wrapped_b64, "".into(), "new_password".into(), salt_b64);
 
     // Should succeed - empty passwords are technically valid
     assert!(result.is_ok());
@@ -325,4 +327,61 @@ fn test_derive_auth_hash_success() {
     let derived_hash = derive_auth_hash_logic(password.to_string(), reg_response.salt.clone());
     assert!(derived_hash.is_ok());
     assert_eq!(derived_hash.unwrap(), reg_response.auth_hash);
+}
+
+// ============================================================================
+// Recovery verifier (hash_recovery_key)
+// ============================================================================
+
+#[test]
+fn test_recovery_verifier_is_deterministic() {
+    // The value sent at recovery must equal the one sent at registration
+    let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
+
+    let at_registration = hash_recovery_key(&reg_response.recovery_key).unwrap();
+    let at_recovery = hash_recovery_key(&reg_response.recovery_key).unwrap();
+
+    assert_eq!(at_registration, at_recovery);
+}
+
+#[test]
+fn test_recovery_verifier_format_matches_server_validation() {
+    // The backend accepts exactly 64 hex characters
+    let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
+
+    let verifier = hash_recovery_key(&reg_response.recovery_key).unwrap();
+
+    assert_eq!(verifier.len(), 64);
+    assert!(verifier.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+#[test]
+fn test_recovery_verifier_differs_per_key_and_hides_the_key() {
+    let (first, first_mek) = register_vault_logic("test_password".to_string()).unwrap();
+    let (second, _) = register_vault_logic("test_password".to_string()).unwrap();
+
+    let first_verifier = hash_recovery_key(&first.recovery_key).unwrap();
+    let second_verifier = hash_recovery_key(&second.recovery_key).unwrap();
+
+    assert_ne!(first_verifier, second_verifier);
+    // The verifier is not the MEK itself in another encoding
+    assert_ne!(first_verifier, hex::encode(&first_mek));
+}
+
+#[test]
+fn test_recovery_verifier_ignores_surrounding_whitespace() {
+    // Recovery keys are pasted by hand
+    let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
+
+    let clean = hash_recovery_key(&reg_response.recovery_key).unwrap();
+    let padded = hash_recovery_key(&format!("  {}\n", reg_response.recovery_key)).unwrap();
+
+    assert_eq!(clean, padded);
+}
+
+#[test]
+fn test_recovery_verifier_rejects_invalid_keys() {
+    assert!(hash_recovery_key("not base64 !!!").is_err());
+    // Valid base64, but not a 32-byte key
+    assert!(hash_recovery_key(&general_purpose::STANDARD.encode([0u8; 16])).is_err());
 }

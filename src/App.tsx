@@ -17,7 +17,6 @@ import AuditLogPage from "./pages/AuditLogPage";
 import AppLayout from "./components/AppLayout";
 import UnlockScreen from "./components/UnlockScreen";
 import { SESSION_REVOKED_EVENT, wipe_sensitive_data } from "./api/axiosClient";
-import { invoke } from "@tauri-apps/api/core";
 import { authService } from "./services/authService";
 import { syncOfflineVault } from "./services/vaultService";
 import { isServerReachable } from "./services/networkProbe";
@@ -132,9 +131,8 @@ function App() {
   // Handle vault unlock after auto-lock
   const handleUnlock = async (password: string) => {
     try {
-      // Re-derive keys and unlock vault via Rust
-      const { salt, wrapped_mek } = await authService.getParams(userEmail);
-      await invoke("login_vault", { password, salt, wrappedMek: wrapped_mek });
+      // Re-derive keys and unlock vault via Rust, from the key cached at login
+      await authService.unlockVault(userEmail, password);
       setIsLocked(false);
       resetAutoLockTimer();
     } finally {

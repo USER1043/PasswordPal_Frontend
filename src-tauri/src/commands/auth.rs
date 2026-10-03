@@ -25,6 +25,21 @@ pub struct LoginResponse {
     pub auth_hash: String,
 }
 
+/// Run CPU-heavy key derivation on a blocking worker thread.
+///
+/// Argon2 is slow by design. A synchronous command runs on the main thread and
+/// freezes the window until it returns, so every command that derives keys is
+/// async and does that work here; the UI stays responsive and can show progress.
+async fn run_blocking<T, F>(work: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| format!("Key derivation task failed: {}", e))?
+}
+
 /// Core logic for registering a vault.
 /// Separated for testing.
 pub fn register_vault_logic(password: String) -> Result<(RegisterResponse, Vec<u8>), String> {
@@ -74,12 +89,15 @@ pub fn register_vault_logic(password: String) -> Result<(RegisterResponse, Vec<u
 /// Registers a new vault by generating fresh keys.
 /// Returns the Salt, Wrapped MEK, and AuthHash to be sent to the server.
 #[tauri::command]
-pub fn register_vault(
+pub async fn register_vault(
     state: State<'_, Mutex<VaultState>>,
     password: String,
 ) -> Result<RegisterResponse, String> {
-    let password = Zeroizing::new(password);
-    let (response, mek) = register_vault_logic(password.as_str().to_owned())?;
+    let (response, mek) = run_blocking(move || {
+        let password = Zeroizing::new(password);
+        register_vault_logic(password.as_str().to_owned())
+    })
+    .await?;
 
     // 6. Store MEK in State (Unlock the vault immediately)
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
@@ -100,9 +118,12 @@ pub fn derive_auth_hash_logic(password: String, salt: String) -> Result<String, 
 
 /// Derives AuthHash for server authentication without unwrapping MEK.
 #[tauri::command]
-pub fn derive_auth_hash(password: String, salt: String) -> Result<String, String> {
-    let password = Zeroizing::new(password);
-    derive_auth_hash_logic(password.as_str().to_owned(), salt)
+pub async fn derive_auth_hash(password: String, salt: String) -> Result<String, String> {
+    run_blocking(move || {
+        let password = Zeroizing::new(password);
+        derive_auth_hash_logic(password.as_str().to_owned(), salt)
+    })
+    .await
 }
 
 /// Core logic for logging in.
@@ -151,14 +172,17 @@ pub fn login_vault_logic(
 /// Logs in by deriving keys and unwrapping the MEK.
 /// Returns AuthHash for server verification.
 #[tauri::command]
-pub fn login_vault(
+pub async fn login_vault(
     state: State<'_, Mutex<VaultState>>,
     password: String,
     salt: String,
     wrapped_mek: String,
 ) -> Result<LoginResponse, String> {
-    let password = Zeroizing::new(password);
-    let (response, mek_vec) = login_vault_logic(password.as_str().to_owned(), salt, wrapped_mek)?;
+    let (response, mek_vec) = run_blocking(move || {
+        let password = Zeroizing::new(password);
+        login_vault_logic(password.as_str().to_owned(), salt, wrapped_mek)
+    })
+    .await?;
 
     // 4. Store MEK in State
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
@@ -232,20 +256,23 @@ pub fn change_password_optimization_logic(
 
 /// Changes the user's password by re-wrapping the Master Encryption Key (MEK).
 #[tauri::command]
-pub fn change_password_optimization(
+pub async fn change_password_optimization(
     encrypted_mek_blob: String,
     old_password: String,
     new_password: String,
     salt: String,
 ) -> Result<String, String> {
-    let old_password = Zeroizing::new(old_password);
-    let new_password = Zeroizing::new(new_password);
-    change_password_optimization_logic(
-        encrypted_mek_blob,
-        old_password.as_str().to_owned(),
-        new_password.as_str().to_owned(),
-        salt,
-    )
+    run_blocking(move || {
+        let old_password = Zeroizing::new(old_password);
+        let new_password = Zeroizing::new(new_password);
+        change_password_optimization_logic(
+            encrypted_mek_blob,
+            old_password.as_str().to_owned(),
+            new_password.as_str().to_owned(),
+            salt,
+        )
+    })
+    .await
 }
 
 #[derive(Serialize)]
@@ -258,8 +285,12 @@ pub struct RecoverVaultResponse {
 /// Hash the recovery key using Argon2id with consistent security parameters
 /// This is called client-side before sending to server for zero-knowledge recovery
 #[tauri::command]
-pub fn hash_recovery_key_command(recovery_key: String) -> Result<String, String> {
-    crypto::hash_recovery_key(&recovery_key)
+pub async fn hash_recovery_key_command(recovery_key: String) -> Result<String, String> {
+    run_blocking(move || {
+        let recovery_key = Zeroizing::new(recovery_key);
+        crypto::hash_recovery_key(&recovery_key)
+    })
+    .await
 }
 
 /// Core logic for recovering a vault using the recovery key.
@@ -313,22 +344,26 @@ pub fn recover_vault_logic(
 /// Recovers a vault using the recovery key (raw MEK base64) and a new master password.
 /// Re-wraps the existing MEK under the new password - vault data is preserved.
 #[tauri::command]
-pub fn recover_vault(
+pub async fn recover_vault(
     state: State<'_, Mutex<VaultState>>,
     recovery_key: String,
     new_password: String,
 ) -> Result<RecoverVaultResponse, String> {
-    let recovery_key = Zeroizing::new(recovery_key);
-    let new_password = Zeroizing::new(new_password);
-    let response = recover_vault_logic(
-        recovery_key.as_str().to_owned(),
-        new_password.as_str().to_owned(),
-    )?;
+    let (response, mek) = run_blocking(move || {
+        let recovery_key = Zeroizing::new(recovery_key);
+        let new_password = Zeroizing::new(new_password);
+        let response = recover_vault_logic(
+            recovery_key.as_str().to_owned(),
+            new_password.as_str().to_owned(),
+        )?;
 
-    // Decode recovery key → store MEK in state so vault is immediately unlocked
-    let mek = general_purpose::STANDARD
-        .decode(recovery_key.as_str())
-        .map_err(|_| "Invalid recovery key")?;
+        // Decode recovery key → the MEK to store in state so the vault is immediately unlocked
+        let mek = general_purpose::STANDARD
+            .decode(recovery_key.as_str())
+            .map_err(|_| "Invalid recovery key")?;
+        Ok((response, mek))
+    })
+    .await?;
     let mut st = state.lock().map_err(|_| "VaultState corrupted")?;
     st.unlock(mek);
 
