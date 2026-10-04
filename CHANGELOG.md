@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.3.0...passwordpal-v0.4.0) (2026-10-03)
+
+
+### Features
+
+* **devices:** persistent device ID, block/unblock and device audit history ([0e2f3a4](https://github.com/USER1043/PasswordPal_Frontend/commit/0e2f3a4a540d9ff086dc085eb6b85602ceeacc3b))
+* **devices:** persistent device ID, block/unblock and device audit history ([df9a145](https://github.com/USER1043/PasswordPal_Frontend/commit/df9a1456b1cc89b3b4a518fa08bbfdd528a7e74f))
+
+
+### Bug Fixes
+
+* **auth:** change-password, re-auth, unlock and recovery flows ([92ae497](https://github.com/USER1043/PasswordPal_Frontend/commit/92ae497aad4b00c1dfceeb034163c5272f4a9801))
+* **auth:** change-password, re-auth, unlock and recovery flows ([e88cf6f](https://github.com/USER1043/PasswordPal_Frontend/commit/e88cf6f58324728bd383e2d7a836e650ae7545a8))
+* **sync:** resolve "keep local" conflicts against the server's current version ([6500675](https://github.com/USER1043/PasswordPal_Frontend/commit/650067554c6c312846f2723f65d1ab14a4359bd5))
+* **vault:** sync version tracking, nonce/ciphertext order and delete handling ([56f63db](https://github.com/USER1043/PasswordPal_Frontend/commit/56f63db1fcca4e3125a49ce2c8c52a9eeef6093c))
+
 ## [0.3.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.2.1...passwordpal-v0.3.0) (2026-08-29)
 
 
