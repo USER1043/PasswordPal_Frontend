@@ -2,6 +2,7 @@
 // TOTP Service - MFA operations via backend /auth/totp/* endpoints
 // ============================================================================
 import apiClient from "../api/axiosClient";
+import type { MfaLoginResponse } from "./authService";
 
 export interface TotpSetupResponse {
     secret?: string;
@@ -36,9 +37,11 @@ export async function verifySetup(code: string, secret: string): Promise<BackupC
 
 /**
  * Verify TOTP code during login (MFA challenge).
+ * Returns the wrapped vault key, which the caller passes to authService.completeMfaLogin.
  */
-export async function verifyLogin(code: string, tempToken?: string): Promise<void> {
-    await apiClient.post("/auth/totp/verify-login", { code, tempToken });
+export async function verifyLogin(code: string, tempToken?: string): Promise<MfaLoginResponse> {
+    const response = await apiClient.post("/auth/totp/verify-login", { code, tempToken });
+    return response.data;
 }
 
 /**
@@ -67,6 +70,7 @@ export async function generateBackupCodes(): Promise<BackupCodesResponse> {
 /**
  * Redeem a backup code (used during login if TOTP device unavailable).
  */
-export async function redeemBackupCode(code: string, tempToken?: string): Promise<void> {
-    await apiClient.post("/auth/totp/backup-codes/redeem", { code, tempToken });
+export async function redeemBackupCode(code: string, tempToken?: string): Promise<MfaLoginResponse> {
+    const response = await apiClient.post("/auth/totp/backup-codes/redeem", { code, tempToken });
+    return response.data;
 }

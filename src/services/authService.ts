@@ -35,7 +35,17 @@ export function unregisterSensitiveStateCallback(cb: () => void): void {
     sensitiveStateCallbacks.delete(cb);
 }
 
+// ============================================================================
+// Pending two-factor login
+// An account with two-factor gets no wrapped key at the password step; it comes
+// with the code check. The password has to survive until then to unwrap it, so it
+// is held here (never in React state) and dropped on every exit: completion,
+// failure, "back to login", logout.
+// ============================================================================
+let pendingMfaLogin: { email: string; password: string; salt: string; authHash: string } | null = null;
+
 function clearAllSensitiveState(): void {
+    pendingMfaLogin = null;
     sensitiveStateCallbacks.forEach(cb => {
         try { cb(); } catch { /* never let a component callback abort the logout */ }
     });
@@ -63,6 +73,12 @@ export interface RegisterResponse {
 
 export interface LoginResponse {
     auth_hash: string;
+}
+
+/** What the server returns once the two-factor step succeeds. */
+export interface MfaLoginResponse {
+    wrapped_mek?: string;
+    salt?: string;
 }
 
 export interface AuthParams {
@@ -216,6 +232,8 @@ export const authService = {
             }
 
             if (response.data?.mfa_required) {
+                // The key arrives with the code check; keep what is needed to unwrap it then.
+                pendingMfaLogin = { email, password: masterPassword, salt, authHash: derivedAuthHash };
                 return {
                     success: false,
                     mfa_required: true,
@@ -244,6 +262,38 @@ export const authService = {
              }
              throw err;
         }
+    },
+
+    /**
+     * Step 3 of a two-factor login: unlock the vault with the key returned by
+     * the code (or backup code) check. Consumes the pending password whether or
+     * not it succeeds.
+     */
+    async completeMfaLogin(data: MfaLoginResponse): Promise<void> {
+        const pending = pendingMfaLogin;
+        pendingMfaLogin = null;
+        if (!pending) {
+            throw new Error("No login in progress. Please log in again.");
+        }
+        if (!data?.wrapped_mek) {
+            throw new Error("The server did not return a vault key (wrapped_mek). Please log in again.");
+        }
+
+        const salt = data.salt || pending.salt;
+        await invoke<LoginResponse>("login_vault", {
+            password: pending.password,
+            salt,
+            wrappedMek: data.wrapped_mek,
+        });
+        await cacheAuthParams(pending.email, salt, data.wrapped_mek, pending.authHash);
+
+        localStorage.setItem("active_user", pending.email);
+        localStorage.removeItem("offline_token");
+    },
+
+    /** Drop the password held for a two-factor login the user abandoned. */
+    cancelMfaLogin(): void {
+        pendingMfaLogin = null;
     },
 
     /**

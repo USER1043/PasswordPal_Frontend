@@ -2,15 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LoginPage from './LoginPage';
 import { authService } from '../services/authService';
+import * as totpService from '../services/totpService';
 import { NotificationProvider } from '../context/NotificationContext';
 
 // Mock authService
 vi.mock('../services/authService', () => ({
   authService: {
-    login: vi.fn()
+    login: vi.fn(),
+    completeMfaLogin: vi.fn(),
+    cancelMfaLogin: vi.fn(),
+    logout: vi.fn(),
   },
   registerSensitiveStateCallback: vi.fn(),
   unregisterSensitiveStateCallback: vi.fn(),
+}));
+
+vi.mock('../services/totpService', () => ({
+  verifyLogin: vi.fn(),
+  redeemBackupCode: vi.fn(),
 }));
 
 // Mock useNotification to prevent it trying to render actual toasts if we accidentally trigger one
@@ -64,6 +73,61 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
         'test@example.com',
         'securepassword123'
       );
+    });
+  });
+
+  describe('two-factor step', () => {
+    const goToMfaStep = async () => {
+      // @ts-expect-error - Mocking login result which is partially typed here
+      authService.login.mockResolvedValueOnce({ success: false, mfa_required: true });
+      renderComponent();
+      fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: 'test@example.com' } });
+      fireEvent.change(screen.getByLabelText(/Master Password/i), { target: { value: 'securepassword123' } });
+      fireEvent.click(screen.getByRole('button', { name: /Unlock Vault/i }));
+      await screen.findByText(/Back to login/i);
+    };
+    const submitCode = () => {
+      fireEvent.change(screen.getByPlaceholderText(/000000|code/i), { target: { value: '123456' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify/i }));
+    };
+
+    it('unlocks the vault with the key the code check returns', async () => {
+      // @ts-expect-error - Mocking partially typed response
+      totpService.verifyLogin.mockResolvedValueOnce({ wrapped_mek: 'wm', salt: 's' });
+      await goToMfaStep();
+      submitCode();
+
+      await waitFor(() => expect(authService.completeMfaLogin).toHaveBeenCalledWith({ wrapped_mek: 'wm', salt: 's' }));
+      await waitFor(() => expect(mockOnNavigate).toHaveBeenCalledWith('vault'));
+    });
+
+    it('does not navigate when the code is wrong', async () => {
+      // @ts-expect-error - Mocking rejection
+      totpService.verifyLogin.mockRejectedValueOnce({ response: { status: 401 } });
+      await goToMfaStep();
+      submitCode();
+
+      await waitFor(() => expect(totpService.verifyLogin).toHaveBeenCalled());
+      expect(authService.completeMfaLogin).not.toHaveBeenCalled();
+      expect(mockOnNavigate).not.toHaveBeenCalled();
+    });
+
+    it('signs out and stays on the login page if the vault cannot be unlocked', async () => {
+      // @ts-expect-error - Mocking partially typed response
+      totpService.verifyLogin.mockResolvedValueOnce({ wrapped_mek: 'wm', salt: 's' });
+      // @ts-expect-error - Mocking rejection
+      authService.completeMfaLogin.mockRejectedValueOnce(new Error('boom'));
+      await goToMfaStep();
+      submitCode();
+
+      await waitFor(() => expect(authService.logout).toHaveBeenCalled());
+      expect(mockOnNavigate).not.toHaveBeenCalled();
+    });
+
+    it('drops the pending password when the user goes back to login', async () => {
+      await goToMfaStep();
+      fireEvent.click(screen.getByText(/Back to login/i));
+      expect(authService.cancelMfaLogin).toHaveBeenCalled();
     });
   });
 });
