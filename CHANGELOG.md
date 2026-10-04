@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.5.0...passwordpal-v0.6.0) (2026-10-04)
+
+
+### Features
+
+* **tauri:** take the allowed backend URL from VITE_BACKEND_URL at build time ([bb810e7](https://github.com/USER1043/PasswordPal_Frontend/commit/bb810e7bdebe74a747e73a0d44207d3636a06b76))
+* **tauri:** take the allowed backend URL from VITE_BACKEND_URL at build time ([07d7988](https://github.com/USER1043/PasswordPal_Frontend/commit/07d7988433062938138551177036ca71fc344525))
+
+
+### Bug Fixes
+
+* **register:** show the recovery key after registering ([4f1c983](https://github.com/USER1043/PasswordPal_Frontend/commit/4f1c983697da34089c390ee259a0d98b7e81b370))
+* **register:** show the recovery key after registering ([b4e6a69](https://github.com/USER1043/PasswordPal_Frontend/commit/b4e6a69f493883c0b362967883cc80bbeee3fa37))
+* **tauri:** allow requests to the Render backend URL ([9c326ae](https://github.com/USER1043/PasswordPal_Frontend/commit/9c326ae14bc2f0b17991684ebefa16f5e8035ae6))
+
 ## [0.5.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.4.0...passwordpal-v0.5.0) (2026-10-04)
 
 
