@@ -38,6 +38,11 @@ interface LoginPageProps {
 const MFA_STEP_MINUTES = 5;
 const MFA_EXPIRED_MESSAGE = `Your sign-in timed out after ${MFA_STEP_MINUTES} minutes. Please log in again.`;
 
+// The server refuses a code it has already accepted once (backend replay protection)
+function isCodeReused(err: unknown): boolean {
+  return (err as { response?: { data?: { code?: string } } }).response?.data?.code === "TOTP_CODE_REUSED";
+}
+
 function isMfaExpired(err: unknown): boolean {
   return (err as { response?: { data?: { code?: string } } }).response?.data?.code === "MFA_SESSION_EXPIRED";
 }
@@ -227,6 +232,8 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         returnToLogin(MFA_EXPIRED_MESSAGE);
       } else if (isDeviceBlocked(err)) {
         notifyError(DEVICE_BLOCKED_MESSAGE);
+      } else if (isCodeReused(err)) {
+        notifyError("That code was already used. Wait for the next code in your authenticator app and try again.");
       } else if (status === 429) {
         notifyError("Too many failed attempts. Please wait a few minutes and try again.");
       } else {

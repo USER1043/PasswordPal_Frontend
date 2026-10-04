@@ -162,6 +162,18 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
       expect(authService.completeMfaLogin).not.toHaveBeenCalled();
     });
 
+    it('stays on the code step when the server says the code was already used', async () => {
+      // @ts-expect-error - Mocking rejection
+      totpService.verifyLogin.mockRejectedValueOnce({ response: { status: 401, data: { code: 'TOTP_CODE_REUSED' } } });
+      await goToMfaStep();
+      submitCode();
+
+      await waitFor(() => expect(totpService.verifyLogin).toHaveBeenCalled());
+      expect(authService.cancelMfaLogin).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Welcome Back/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/Back to login/i)).toBeInTheDocument();
+    });
+
     it('stays on the code step for a plain wrong code', async () => {
       // @ts-expect-error - Mocking rejection
       totpService.verifyLogin.mockRejectedValueOnce({ response: { status: 401, data: { error: 'Invalid code. Please try again.' } } });
