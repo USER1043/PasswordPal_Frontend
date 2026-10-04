@@ -107,10 +107,10 @@ export const authService = {
             password: masterPassword,
         });
 
-        // SECURITY: the recovery key (raw MEK) never leaves the device. The server gets a
-        // one-way verifier derived from it in Rust - the same value every time, so it can
-        // be matched again during recovery.
-        const recoveryKeyHash = await invoke<string>("hash_recovery_key_command", {
+        // SECURITY: the recovery key (raw MEK) never leaves the device. The server gets only
+        // the public half of an Ed25519 key pair derived from it in Rust. Recovery later
+        // proves possession by signing a one-time challenge, so nothing replayable is sent.
+        const recoveryPublicKey = await invoke<string>("recovery_public_key_command", {
             recoveryKey: verifyKeys.recovery_key,
         });
 
@@ -119,12 +119,50 @@ export const authService = {
             salt: verifyKeys.salt,
             wrapped_mek: verifyKeys.wrapped_mek,
             auth_hash: verifyKeys.auth_hash,
-            recovery_key_hash: recoveryKeyHash,
+            recovery_public_key: recoveryPublicKey,
         });
 
         await cacheAuthParams(email, verifyKeys.salt, verifyKeys.wrapped_mek, verifyKeys.auth_hash);
 
         return verifyKeys.recovery_key;
+    },
+
+    /**
+     * Recover an account with the recovery key: re-wrap the existing vault key under a
+     * new master password, then prove possession of the recovery key by signing a
+     * one-time server challenge together with the new credentials.
+     * The recovery key itself is never sent.
+     */
+    async recoverAccount(email: string, recoveryKey: string, newPassword: string): Promise<void> {
+        const key = recoveryKey.trim();
+
+        // Ask first, so a network failure happens before anything changes locally
+        const challengeResponse = await apiClient.post("/auth/recover/challenge", { email }) as ApiResponse<{ challenge: string }>;
+        const { challenge } = challengeResponse.data;
+
+        // Re-wraps the existing MEK from the recovery key - no new MEK is generated
+        const recoverData = await invoke<{
+            new_salt: string;
+            new_wrapped_mek: string;
+            new_auth_hash: string;
+        }>("recover_vault", { recoveryKey: key, newPassword });
+
+        const signature = await invoke<string>("sign_recovery_request_command", {
+            recoveryKey: key,
+            challenge,
+            newSalt: recoverData.new_salt,
+            newWrappedMek: recoverData.new_wrapped_mek,
+            newAuthHash: recoverData.new_auth_hash,
+        });
+
+        await apiClient.post("/auth/recover", {
+            email,
+            challenge,
+            signature,
+            new_salt: recoverData.new_salt,
+            new_wrapped_mek: recoverData.new_wrapped_mek,
+            new_auth_hash: recoverData.new_auth_hash,
+        });
     },
 
     /**

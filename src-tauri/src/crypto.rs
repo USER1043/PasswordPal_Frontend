@@ -91,16 +91,8 @@ pub fn derive_keys_from_kek(kek: &[u8]) -> (Zeroizing<[u8; 32]>, Zeroizing<[u8; 
     (auth_key, enc_key)
 }
 
-/// Derives the recovery verifier sent to the server at registration and recovery.
-///
-/// The recovery key is the raw MEK (base64) and must never leave the device.
-/// The server only needs to check that the same key is presented again, so it
-/// gets a one-way, domain-separated BLAKE3 derivation of it: 64 hex characters.
-///
-/// This must be deterministic - the value sent during recovery has to equal the
-/// one sent at registration, so no random salt. The MEK is 256 random bits, so
-/// a fast hash is enough here; the server stores an Argon2id hash of the verifier.
-pub fn hash_recovery_key(recovery_key: &str) -> Result<String, String> {
+/// Decodes a pasted recovery key (the raw 32-byte vault key, base64).
+fn decode_recovery_key(recovery_key: &str) -> Result<Zeroizing<Vec<u8>>, String> {
     let mek = Zeroizing::new(
         general_purpose::STANDARD
             .decode(recovery_key.trim())
@@ -110,7 +102,56 @@ pub fn hash_recovery_key(recovery_key: &str) -> Result<String, String> {
     if mek.len() != 32 {
         return Err("Invalid recovery key: wrong length".into());
     }
+    Ok(mek)
+}
 
-    let verifier = blake3::derive_key("passwordpal_recovery_verifier_v1", &mek);
-    Ok(hex::encode(verifier))
+/// Derives the Ed25519 key pair used to prove possession of the recovery key.
+///
+/// The recovery key is the raw MEK and never leaves the device. The signing seed is
+/// a domain-separated BLAKE3 derivation of it (a context string no other key uses),
+/// so the key pair is deterministic: registration and recovery derive the same one.
+/// The server stores only the public key and can check signatures, not make them.
+fn recovery_signing_key(recovery_key: &str) -> Result<ed25519_dalek::SigningKey, String> {
+    let mek = decode_recovery_key(recovery_key)?;
+    let seed = Zeroizing::new(blake3::derive_key("passwordpal_recovery_signing_v1", &mek));
+    Ok(ed25519_dalek::SigningKey::from_bytes(&seed))
+}
+
+/// The recovery public key sent to the server at registration: the raw 32-byte
+/// Ed25519 public key as 64 hex characters.
+pub fn recovery_public_key(recovery_key: &str) -> Result<String, String> {
+    let signing_key = recovery_signing_key(recovery_key)?;
+    Ok(hex::encode(signing_key.verifying_key().to_bytes()))
+}
+
+/// The bytes signed for recovery. Must match the server's `buildRecoveryMessage`
+/// (utils/recoverySignature.js) exactly: a domain line, then each field as
+/// `<length in UTF-8 bytes>:<value>\n`, so no two field sets share a message.
+pub fn build_recovery_message(
+    challenge: &str,
+    new_salt: &str,
+    new_wrapped_mek: &str,
+    new_auth_hash: &str,
+) -> Vec<u8> {
+    let mut message = String::from("passwordpal-recovery-v1\n");
+    for field in [challenge, new_salt, new_wrapped_mek, new_auth_hash] {
+        message.push_str(&format!("{}:{}\n", field.len(), field));
+    }
+    message.into_bytes()
+}
+
+/// Signs the server's one-time challenge together with the new credentials.
+/// Returns the 64-byte Ed25519 signature as 128 hex characters.
+pub fn sign_recovery_request(
+    recovery_key: &str,
+    challenge: &str,
+    new_salt: &str,
+    new_wrapped_mek: &str,
+    new_auth_hash: &str,
+) -> Result<String, String> {
+    use ed25519_dalek::Signer;
+
+    let signing_key = recovery_signing_key(recovery_key)?;
+    let message = build_recovery_message(challenge, new_salt, new_wrapped_mek, new_auth_hash);
+    Ok(hex::encode(signing_key.sign(&message).to_bytes()))
 }

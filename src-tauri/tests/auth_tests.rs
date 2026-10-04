@@ -12,7 +12,7 @@ use passwordpal_lib::commands::auth::{
     change_password_optimization_logic, derive_auth_hash_logic, login_vault_logic,
     register_vault_logic,
 };
-use passwordpal_lib::crypto::hash_recovery_key;
+use passwordpal_lib::crypto::{build_recovery_message, recovery_public_key, sign_recovery_request};
 use zeroize::Zeroizing;
 
 /// Helper to create a wrapped MEK with a given password
@@ -330,58 +330,111 @@ fn test_derive_auth_hash_success() {
 }
 
 // ============================================================================
-// Recovery verifier (hash_recovery_key)
+// Recovery signature (Ed25519 key derived from the recovery key)
 // ============================================================================
 
+/// Fixed recovery key (bytes 0..32, base64) and request, shared with the backend's
+/// tests (tests/recoverySignature.test.js) so both sides provably agree on the key
+/// derivation, the signed message and the signature format.
+const VECTOR_RECOVERY_KEY: &str = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
+const VECTOR_CHALLENGE: &str = "KNOWN_CHALLENGE";
+const VECTOR_SALT: &str = "c2FsdA==";
+const VECTOR_WRAPPED_MEK: &str = "d3JhcHBlZA==";
+const VECTOR_AUTH_HASH: &str = "VECTOR_AUTH_HASH";
+const VECTOR_PUBLIC_KEY: &str = "90c14d1ba9652b757b7dba25cf4a53574bcba021c5b56448a00e5159eafebe1d";
+const VECTOR_SIGNATURE: &str = "523c1ce689d02a6d078cba9ba9732f41c546bc897e50a9915c01873fbd0fe00e9c298e58a01f538ac8be4ea15fb8a7ffd31ad6fb848fe938ec7c25b65c07700b";
+
 #[test]
-fn test_recovery_verifier_is_deterministic() {
-    // The value sent at recovery must equal the one sent at registration
+fn test_recovery_public_key_matches_backend_vector() {
+    assert_eq!(
+        recovery_public_key(VECTOR_RECOVERY_KEY).unwrap(),
+        VECTOR_PUBLIC_KEY
+    );
+}
+
+#[test]
+fn test_recovery_signature_matches_backend_vector() {
+    let signature = sign_recovery_request(
+        VECTOR_RECOVERY_KEY,
+        VECTOR_CHALLENGE,
+        VECTOR_SALT,
+        VECTOR_WRAPPED_MEK,
+        VECTOR_AUTH_HASH,
+    )
+    .unwrap();
+    // Ed25519 is deterministic, so the backend can verify this exact value
+    assert_eq!(signature, VECTOR_SIGNATURE);
+}
+
+#[test]
+fn test_recovery_message_format_matches_backend() {
+    let message = build_recovery_message("c", "s", "m", "h");
+    assert_eq!(
+        message,
+        b"passwordpal-recovery-v1\n1:c\n1:s\n1:m\n1:h\n".to_vec()
+    );
+    // Length is in UTF-8 bytes, not characters
+    let utf8 = build_recovery_message("\u{e9}", "s", "m", "h");
+    assert!(String::from_utf8(utf8).unwrap().contains("2:\u{e9}\n"));
+}
+
+#[test]
+fn test_recovery_public_key_is_deterministic_and_64_hex() {
+    // Registration and recovery must derive the same key pair
     let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
 
-    let at_registration = hash_recovery_key(&reg_response.recovery_key).unwrap();
-    let at_recovery = hash_recovery_key(&reg_response.recovery_key).unwrap();
+    let at_registration = recovery_public_key(&reg_response.recovery_key).unwrap();
+    let at_recovery = recovery_public_key(&reg_response.recovery_key).unwrap();
 
     assert_eq!(at_registration, at_recovery);
+    assert_eq!(at_registration.len(), 64);
+    assert!(at_registration.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
 #[test]
-fn test_recovery_verifier_format_matches_server_validation() {
-    // The backend accepts exactly 64 hex characters
-    let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
-
-    let verifier = hash_recovery_key(&reg_response.recovery_key).unwrap();
-
-    assert_eq!(verifier.len(), 64);
-    assert!(verifier.chars().all(|c| c.is_ascii_hexdigit()));
-}
-
-#[test]
-fn test_recovery_verifier_differs_per_key_and_hides_the_key() {
+fn test_recovery_public_key_differs_per_key_and_is_not_the_key() {
     let (first, first_mek) = register_vault_logic("test_password".to_string()).unwrap();
     let (second, _) = register_vault_logic("test_password".to_string()).unwrap();
 
-    let first_verifier = hash_recovery_key(&first.recovery_key).unwrap();
-    let second_verifier = hash_recovery_key(&second.recovery_key).unwrap();
+    let first_pk = recovery_public_key(&first.recovery_key).unwrap();
+    let second_pk = recovery_public_key(&second.recovery_key).unwrap();
 
-    assert_ne!(first_verifier, second_verifier);
-    // The verifier is not the MEK itself in another encoding
-    assert_ne!(first_verifier, hex::encode(&first_mek));
+    assert_ne!(first_pk, second_pk);
+    assert_ne!(first_pk, hex::encode(&first_mek));
 }
 
 #[test]
-fn test_recovery_verifier_ignores_surrounding_whitespace() {
+fn test_recovery_signature_covers_the_challenge_and_the_new_values() {
+    let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
+    let key = &reg_response.recovery_key;
+    let sign = |c: &str, salt: &str, mek: &str, auth: &str| {
+        sign_recovery_request(key, c, salt, mek, auth).unwrap()
+    };
+
+    let base = sign("ch", "salt", "mek", "auth");
+    assert_eq!(base.len(), 128);
+    assert_eq!(base, sign("ch", "salt", "mek", "auth"));
+    assert_ne!(base, sign("other", "salt", "mek", "auth"));
+    assert_ne!(base, sign("ch", "other", "mek", "auth"));
+    assert_ne!(base, sign("ch", "salt", "other", "auth"));
+    assert_ne!(base, sign("ch", "salt", "mek", "other"));
+}
+
+#[test]
+fn test_recovery_signature_ignores_surrounding_whitespace_in_the_key() {
     // Recovery keys are pasted by hand
     let (reg_response, _) = register_vault_logic("test_password".to_string()).unwrap();
 
-    let clean = hash_recovery_key(&reg_response.recovery_key).unwrap();
-    let padded = hash_recovery_key(&format!("  {}\n", reg_response.recovery_key)).unwrap();
+    let clean = recovery_public_key(&reg_response.recovery_key).unwrap();
+    let padded = recovery_public_key(&format!("  {}\n", reg_response.recovery_key)).unwrap();
 
     assert_eq!(clean, padded);
 }
 
 #[test]
-fn test_recovery_verifier_rejects_invalid_keys() {
-    assert!(hash_recovery_key("not base64 !!!").is_err());
-    // Valid base64, but not a 32-byte key
-    assert!(hash_recovery_key(&general_purpose::STANDARD.encode([0u8; 16])).is_err());
+fn test_recovery_rejects_malformed_keys() {
+    assert!(recovery_public_key("not base64!!").is_err());
+    // Valid base64, wrong length
+    assert!(recovery_public_key("AAECAw==").is_err());
+    assert!(sign_recovery_request("AAECAw==", "c", "s", "m", "h").is_err());
 }
