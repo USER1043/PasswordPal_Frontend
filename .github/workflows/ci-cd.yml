@@ -55,7 +55,8 @@ jobs:
       - name: Build web assets (Vite)
         run: npm run build
         env:
-          VITE_BACKEND_URL: https://passwordpal-backend.onrender.com
+          # Falls back to localhost when unset (e.g. PRs from forks); this is only a CI artifact
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
 
       - name: Upload web dist artifact
         uses: actions/upload-artifact@v4
@@ -195,13 +196,25 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      # The same value sets the app's API base (Vite) and the URL the app is allowed to
+      # call (build.rs), so a release build must never go out without it.
+      - name: Require the backend URL
+        shell: bash
+        run: |
+          if [ -z "$VITE_BACKEND_URL" ]; then
+            echo "::error::Set the VITE_BACKEND_URL repository secret to the deployed backend URL"
+            exit 1
+          fi
+        env:
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          VITE_BACKEND_URL: https://passwordpal-backend.onrender.com
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
         with:
           releaseId: ${{ needs.release-please.outputs.release-id }}
 

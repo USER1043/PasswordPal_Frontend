@@ -1,27 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window. HTTP access (http:default, scoped to the backend URL) is granted by capabilities/backend-url.json, which build.rs generates from VITE_BACKEND_URL.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    {
-      "identifier": "http:default",
-      "allow": [
-        {
-          "url": "https://passwordpal-backend.onrender.com/*"
-        },
-        {
-          "url": "https://passwordpal-backend-uh7a.onrender.com/*"
-        },
-        {
-          "url": "http://localhost:3000/*"
-        }
-      ]
-    },
-    "opener:default",
-    "http:default"
+    "opener:default"
   ]
 }
