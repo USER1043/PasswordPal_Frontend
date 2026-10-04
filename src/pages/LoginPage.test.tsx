@@ -101,6 +101,34 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
       await waitFor(() => expect(mockOnNavigate).toHaveBeenCalledWith('vault'));
     });
 
+    it('lets the user trust the device, and sends that choice with the code', async () => {
+      // @ts-expect-error - Mocking partially typed response
+      totpService.verifyLogin.mockResolvedValueOnce({ wrapped_mek: 'wm', salt: 's' });
+      await goToMfaStep();
+      const checkbox = screen.getByLabelText(/Trust this device for 30 days/i);
+      expect(checkbox).not.toBeChecked();
+      fireEvent.click(checkbox);
+      submitCode();
+
+      await waitFor(() => expect(totpService.verifyLogin).toHaveBeenCalledWith('123456', undefined, true));
+    });
+
+    it('does not trust the device unless the box is ticked', async () => {
+      // @ts-expect-error - Mocking partially typed response
+      totpService.verifyLogin.mockResolvedValueOnce({ wrapped_mek: 'wm', salt: 's' });
+      await goToMfaStep();
+      submitCode();
+
+      await waitFor(() => expect(totpService.verifyLogin).toHaveBeenCalledWith('123456', undefined, false));
+    });
+
+    it('hides the option for backup codes, which the server does not remember', async () => {
+      await goToMfaStep();
+      expect(screen.getByLabelText(/Trust this device for 30 days/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByText(/Use a backup code instead/i));
+      expect(screen.queryByLabelText(/Trust this device for 30 days/i)).not.toBeInTheDocument();
+    });
+
     it('does not navigate when the code is wrong', async () => {
       // @ts-expect-error - Mocking rejection
       totpService.verifyLogin.mockRejectedValueOnce({ response: { status: 401 } });

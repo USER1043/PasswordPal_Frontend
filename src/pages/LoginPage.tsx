@@ -56,6 +56,8 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const [useBackupCode, setUseBackupCode] = useState(false);
+  // "Trust this device": skip the authenticator code on this device for 30 days
+  const [trustDevice, setTrustDevice] = useState(false);
 
   // Populate suggestions when email input changes
   useEffect(() => {
@@ -164,7 +166,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
     try {
       const mfaResult = useBackupCode
         ? await totpService.redeemBackupCode(mfaCode)
-        : await totpService.verifyLogin(mfaCode);
+        : await totpService.verifyLogin(mfaCode, undefined, trustDevice);
 
       // The code was right: unlock the vault with the key it returned
       try {
@@ -175,6 +177,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         await authService.logout();
         setMfaRequired(false);
         setMfaCode("");
+        setTrustDevice(false);
         notifyError("Could not unlock your vault. Please log in again.");
         return;
       }
@@ -186,8 +189,11 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       onNavigate("vault");
     } catch (err: unknown) {
       console.error("MFA Error:", err);
+      const status = (err as { response?: { status?: number } }).response?.status;
       if (isDeviceBlocked(err)) {
         notifyError(DEVICE_BLOCKED_MESSAGE);
+      } else if (status === 429) {
+        notifyError("Too many failed attempts. Please wait a few minutes and try again.");
       } else {
         notifyError(useBackupCode ? "Invalid backup code" : "Invalid authentication code");
       }
@@ -360,6 +366,28 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                 />
               </div>
 
+              {/* The server only remembers a device after an authenticator code, not a backup code */}
+              {!useBackupCode && (
+                <label
+                  htmlFor="trust-device-checkbox"
+                  className="flex items-start gap-3 mb-6 text-sm text-slate-300 cursor-pointer select-none"
+                >
+                  <input
+                    id="trust-device-checkbox"
+                    type="checkbox"
+                    checked={trustDevice}
+                    onChange={(e) => setTrustDevice(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-purple-500/40 bg-slate-950/50 accent-purple-500"
+                  />
+                  <span>
+                    Trust this device for 30 days
+                    <span className="block text-xs text-slate-500">
+                      Skip the code on this device. Only use this on a device you own.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               <button
                 onClick={handleMfaVerify}
                 disabled={loading}
@@ -391,6 +419,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                     authService.cancelMfaLogin();
                     setMfaRequired(false);
                     setMfaCode("");
+                    setTrustDevice(false);
                   }}
                   className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
                 >
