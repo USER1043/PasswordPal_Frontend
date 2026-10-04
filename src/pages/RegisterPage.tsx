@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import RecoveryKeyModal from "../components/RecoveryKeyModal";
 // import { generateRecoveryKey, generateSalt, hashPassword } from "../utils/crypto"; // Mock utils unused
-import { registerDevice } from "../services/deviceService";
 import { authService } from "../services/authService";
 // import { invoke } from "@tauri-apps/api/core";
 
@@ -83,8 +82,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       const key = await authService.register(email, masterPassword);
       setRecoveryKey(key);
 
-      // Register device (mock for now, but good to keep flow)
-      await registerDevice();
+      // No device registration here: registering does not sign the user in, so that call
+      // would hit an authenticated endpoint without a session. Its 401 makes the API client
+      // announce a revoked session, the app returns to the login view, and this page (and
+      // the recovery key modal below) disappears. The device is registered at first login.
 
       // Immediately wipe passwords from React state before showing the recovery modal
       setMasterPassword("");
