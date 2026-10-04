@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.6.0...passwordpal-v0.7.0) (2026-10-04)
+
+
+### Features
+
+* **login:** add a 'trust this device' option to the two-factor step ([9fa948f](https://github.com/USER1043/PasswordPal_Frontend/commit/9fa948f8ada869c4a50896e2d0031f7bd62efcdc))
+* **login:** explain a reused two-factor code ([5590e3a](https://github.com/USER1043/PasswordPal_Frontend/commit/5590e3a52cd918534811aca9ee59c5c27c44694b))
+* **login:** say that the two-factor step expires after 5 minutes ([818e7a4](https://github.com/USER1043/PasswordPal_Frontend/commit/818e7a40113be98cf62d9a59b3625c2a9bf03ebe))
+* **login:** two-factor step improvements (trust this device, timeout message, clearer errors) ([dc80712](https://github.com/USER1043/PasswordPal_Frontend/commit/dc80712aa179a050a866abf75670580136381d49))
+
 ## [0.6.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.5.0...passwordpal-v0.6.0) (2026-10-04)
 
 
