@@ -221,7 +221,6 @@ describe('authService - Session Isolation', () => {
       expect(JSON.stringify((apiClient.post as unknown as { mock: { calls: unknown[] } }).mock.calls)).not.toContain('my-master-password');
     });
   });
-
 });
 
 describe('authService - recovery by signature', () => {
@@ -278,5 +277,76 @@ describe('authService - recovery by signature', () => {
 
     await expect(authService.recoverAccount('a@b.c', 'RECOVERY-KEY', 'new-pass')).rejects.toBeDefined();
     expect(invoke).not.toHaveBeenCalledWith('recover_vault', expect.anything());
+  });
+});
+
+describe('authService - two-factor login unlocks the vault', () => {
+  const EMAIL = 'a@b.c';
+  const PASSWORD = 'master-pass';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    // @ts-expect-error - Mocking invoke
+    invoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'derive_auth_hash') return 'auth-hash';
+      if (cmd === 'login_vault') return { auth_hash: 'auth-hash' };
+      return null;
+    });
+    // @ts-expect-error - Mocking apiClient get (/auth/params returns only the salt)
+    apiClient.get.mockResolvedValue({ data: { salt: 'salt-1' } });
+    // @ts-expect-error - Mocking apiClient post (password step of an MFA account)
+    apiClient.post.mockResolvedValue({ data: { mfa_required: true } });
+  });
+
+  it('does not unlock at the password step, which has no wrapped_mek yet', async () => {
+    const result = await authService.login(EMAIL, PASSWORD);
+    expect(result.mfa_required).toBe(true);
+    expect(invoke).not.toHaveBeenCalledWith('login_vault', expect.anything());
+    authService.cancelMfaLogin();
+  });
+
+  it('unlocks the vault and caches auth params with the key from the 2FA response', async () => {
+    await authService.login(EMAIL, PASSWORD);
+    await authService.completeMfaLogin({ wrapped_mek: 'wrapped-from-2fa', salt: 'salt-1' });
+
+    expect(invoke).toHaveBeenCalledWith('login_vault', {
+      password: PASSWORD, salt: 'salt-1', wrappedMek: 'wrapped-from-2fa',
+    });
+    expect(invoke).toHaveBeenCalledWith('cache_auth_params', {
+      email: EMAIL, salt: 'salt-1', wrappedMek: 'wrapped-from-2fa', localPasswordHash: 'auth-hash',
+    });
+    expect(localStorage.getItem('active_user')).toBe(EMAIL);
+  });
+
+  it('forgets the password once the login completes', async () => {
+    await authService.login(EMAIL, PASSWORD);
+    await authService.completeMfaLogin({ wrapped_mek: 'w', salt: 'salt-1' });
+    await expect(authService.completeMfaLogin({ wrapped_mek: 'w', salt: 'salt-1' })).rejects.toThrow(/no login in progress/i);
+  });
+
+  it('forgets the password if the user backs out', async () => {
+    await authService.login(EMAIL, PASSWORD);
+    authService.cancelMfaLogin();
+    await expect(authService.completeMfaLogin({ wrapped_mek: 'w', salt: 'salt-1' })).rejects.toThrow(/no login in progress/i);
+  });
+
+  it('forgets the password on logout', async () => {
+    await authService.login(EMAIL, PASSWORD);
+    await authService.logout();
+    await expect(authService.completeMfaLogin({ wrapped_mek: 'w', salt: 'salt-1' })).rejects.toThrow(/no login in progress/i);
+  });
+
+  it('forgets the password even when unlocking fails, and says so', async () => {
+    await authService.login(EMAIL, PASSWORD);
+    // @ts-expect-error - Mocking invoke
+    invoke.mockRejectedValueOnce('Invalid password');
+    await expect(authService.completeMfaLogin({ wrapped_mek: 'w', salt: 'salt-1' })).rejects.toBeDefined();
+    await expect(authService.completeMfaLogin({ wrapped_mek: 'w', salt: 'salt-1' })).rejects.toThrow(/no login in progress/i);
+  });
+
+  it('refuses to unlock when the server sent no wrapped_mek', async () => {
+    await authService.login(EMAIL, PASSWORD);
+    await expect(authService.completeMfaLogin({})).rejects.toThrow(/wrapped_mek|key/i);
   });
 });
