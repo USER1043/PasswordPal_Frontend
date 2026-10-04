@@ -33,6 +33,15 @@ interface LoginPageProps {
   onLoginSuccess?: (email: string) => void;
 }
 
+// How long the server keeps the "password verified, enter the code" step open
+// (the MFA-pending token in the backend's authController.login expires after 5 minutes).
+const MFA_STEP_MINUTES = 5;
+const MFA_EXPIRED_MESSAGE = `Your sign-in timed out after ${MFA_STEP_MINUTES} minutes. Please log in again.`;
+
+function isMfaExpired(err: unknown): boolean {
+  return (err as { response?: { data?: { code?: string } } }).response?.data?.code === "MFA_SESSION_EXPIRED";
+}
+
 const DEVICE_BLOCKED_MESSAGE = "This device has been blocked from this account.";
 
 function isDeviceBlocked(err: unknown): boolean {
@@ -96,6 +105,29 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       authService.cancelMfaLogin();
     };
   }, []);
+
+  // Leave the code step: drop what is held for it and show the login form again
+  const returnToLogin = (message?: string) => {
+    authService.cancelMfaLogin();
+    setMfaRequired(false);
+    setMfaCode("");
+    setTrustDevice(false);
+    setUseBackupCode(false);
+    if (message) notifyError(message);
+  };
+
+  // The step expires on the server after MFA_STEP_MINUTES; tell the user instead of letting
+  // them type a code that can no longer work. The ref keeps the timer from restarting on re-render.
+  const expireMfaStep = useRef(returnToLogin);
+  expireMfaStep.current = returnToLogin;
+  useEffect(() => {
+    if (!mfaRequired) return;
+    const timer = setTimeout(
+      () => expireMfaStep.current(MFA_EXPIRED_MESSAGE),
+      MFA_STEP_MINUTES * 60 * 1000,
+    );
+    return () => clearTimeout(timer);
+  }, [mfaRequired]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -190,7 +222,10 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
     } catch (err: unknown) {
       console.error("MFA Error:", err);
       const status = (err as { response?: { status?: number } }).response?.status;
-      if (isDeviceBlocked(err)) {
+      if (isMfaExpired(err)) {
+        // The server no longer accepts this step (the client timer can drift from it)
+        returnToLogin(MFA_EXPIRED_MESSAGE);
+      } else if (isDeviceBlocked(err)) {
         notifyError(DEVICE_BLOCKED_MESSAGE);
       } else if (status === 429) {
         notifyError("Too many failed attempts. Please wait a few minutes and try again.");
@@ -351,6 +386,9 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                     ? "Enter one of your backup recovery codes"
                     : "Enter the 6-digit code from your authenticator app"}
                 </p>
+                <p className="text-slate-500 text-xs mt-2">
+                  Your password was accepted. Enter the code within {MFA_STEP_MINUTES} minutes, or you will need to log in again.
+                </p>
               </div>
 
               <div className="mb-6">
@@ -415,12 +453,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                 </button>
                 <br />
                 <button
-                  onClick={() => {
-                    authService.cancelMfaLogin();
-                    setMfaRequired(false);
-                    setMfaCode("");
-                    setTrustDevice(false);
-                  }}
+                  onClick={() => returnToLogin()}
                   className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
                 >
                   ← Back to login

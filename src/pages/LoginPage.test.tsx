@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import LoginPage from './LoginPage';
 import { authService } from '../services/authService';
 import * as totpService from '../services/totpService';
@@ -127,6 +127,50 @@ describe('LoginPage - Session Isolation & Fingerprinting', () => {
       expect(screen.getByLabelText(/Trust this device for 30 days/i)).toBeInTheDocument();
       fireEvent.click(screen.getByText(/Use a backup code instead/i));
       expect(screen.queryByLabelText(/Trust this device for 30 days/i)).not.toBeInTheDocument();
+    });
+
+    it('tells the user the code must be entered within 5 minutes', async () => {
+      await goToMfaStep();
+      expect(screen.getByText(/within 5 minutes/i)).toBeInTheDocument();
+    });
+
+    it('returns to the login form once the 5 minute step has timed out', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        await goToMfaStep();
+        expect(screen.queryByText(/Welcome Back/i)).not.toBeInTheDocument();
+
+        act(() => { vi.advanceTimersByTime(4 * 60 * 1000); });
+        expect(screen.queryByText(/Welcome Back/i)).not.toBeInTheDocument();
+
+        act(() => { vi.advanceTimersByTime(61 * 1000); });
+        expect(await screen.findByText(/Welcome Back/i)).toBeInTheDocument();
+        expect(authService.cancelMfaLogin).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('returns to the login form when the server says the step expired', async () => {
+      // @ts-expect-error - Mocking rejection
+      totpService.verifyLogin.mockRejectedValueOnce({ response: { status: 401, data: { code: 'MFA_SESSION_EXPIRED' } } });
+      await goToMfaStep();
+      submitCode();
+
+      expect(await screen.findByText(/Welcome Back/i)).toBeInTheDocument();
+      expect(authService.cancelMfaLogin).toHaveBeenCalled();
+      expect(authService.completeMfaLogin).not.toHaveBeenCalled();
+    });
+
+    it('stays on the code step for a plain wrong code', async () => {
+      // @ts-expect-error - Mocking rejection
+      totpService.verifyLogin.mockRejectedValueOnce({ response: { status: 401, data: { error: 'Invalid code. Please try again.' } } });
+      await goToMfaStep();
+      submitCode();
+
+      await waitFor(() => expect(totpService.verifyLogin).toHaveBeenCalled());
+      expect(screen.queryByText(/Welcome Back/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/Back to login/i)).toBeInTheDocument();
     });
 
     it('does not navigate when the code is wrong', async () => {
