@@ -33,6 +33,20 @@ interface LoginPageProps {
   onLoginSuccess?: (email: string) => void;
 }
 
+// How long the server keeps the "password verified, enter the code" step open
+// (the MFA-pending token in the backend's authController.login expires after 5 minutes).
+const MFA_STEP_MINUTES = 5;
+const MFA_EXPIRED_MESSAGE = `Your sign-in timed out after ${MFA_STEP_MINUTES} minutes. Please log in again.`;
+
+// The server refuses a code it has already accepted once (backend replay protection)
+function isCodeReused(err: unknown): boolean {
+  return (err as { response?: { data?: { code?: string } } }).response?.data?.code === "TOTP_CODE_REUSED";
+}
+
+function isMfaExpired(err: unknown): boolean {
+  return (err as { response?: { data?: { code?: string } } }).response?.data?.code === "MFA_SESSION_EXPIRED";
+}
+
 const DEVICE_BLOCKED_MESSAGE = "This device has been blocked from this account.";
 
 function isDeviceBlocked(err: unknown): boolean {
@@ -56,6 +70,8 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const [useBackupCode, setUseBackupCode] = useState(false);
+  // "Trust this device": skip the authenticator code on this device for 30 days
+  const [trustDevice, setTrustDevice] = useState(false);
 
   // Populate suggestions when email input changes
   useEffect(() => {
@@ -94,6 +110,29 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       authService.cancelMfaLogin();
     };
   }, []);
+
+  // Leave the code step: drop what is held for it and show the login form again
+  const returnToLogin = (message?: string) => {
+    authService.cancelMfaLogin();
+    setMfaRequired(false);
+    setMfaCode("");
+    setTrustDevice(false);
+    setUseBackupCode(false);
+    if (message) notifyError(message);
+  };
+
+  // The step expires on the server after MFA_STEP_MINUTES; tell the user instead of letting
+  // them type a code that can no longer work. The ref keeps the timer from restarting on re-render.
+  const expireMfaStep = useRef(returnToLogin);
+  expireMfaStep.current = returnToLogin;
+  useEffect(() => {
+    if (!mfaRequired) return;
+    const timer = setTimeout(
+      () => expireMfaStep.current(MFA_EXPIRED_MESSAGE),
+      MFA_STEP_MINUTES * 60 * 1000,
+    );
+    return () => clearTimeout(timer);
+  }, [mfaRequired]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -164,7 +203,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
     try {
       const mfaResult = useBackupCode
         ? await totpService.redeemBackupCode(mfaCode)
-        : await totpService.verifyLogin(mfaCode);
+        : await totpService.verifyLogin(mfaCode, undefined, trustDevice);
 
       // The code was right: unlock the vault with the key it returned
       try {
@@ -175,6 +214,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
         await authService.logout();
         setMfaRequired(false);
         setMfaCode("");
+        setTrustDevice(false);
         notifyError("Could not unlock your vault. Please log in again.");
         return;
       }
@@ -186,8 +226,16 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
       onNavigate("vault");
     } catch (err: unknown) {
       console.error("MFA Error:", err);
-      if (isDeviceBlocked(err)) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      if (isMfaExpired(err)) {
+        // The server no longer accepts this step (the client timer can drift from it)
+        returnToLogin(MFA_EXPIRED_MESSAGE);
+      } else if (isDeviceBlocked(err)) {
         notifyError(DEVICE_BLOCKED_MESSAGE);
+      } else if (isCodeReused(err)) {
+        notifyError("That code was already used. Wait for the next code in your authenticator app and try again.");
+      } else if (status === 429) {
+        notifyError("Too many failed attempts. Please wait a few minutes and try again.");
       } else {
         notifyError(useBackupCode ? "Invalid backup code" : "Invalid authentication code");
       }
@@ -345,6 +393,9 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                     ? "Enter one of your backup recovery codes"
                     : "Enter the 6-digit code from your authenticator app"}
                 </p>
+                <p className="text-slate-500 text-xs mt-2">
+                  Your password was accepted. Enter the code within {MFA_STEP_MINUTES} minutes, or you will need to log in again.
+                </p>
               </div>
 
               <div className="mb-6">
@@ -359,6 +410,28 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                   className="w-full bg-slate-950/50 border border-purple-500/30 rounded-xl px-4 py-4 text-white text-center text-2xl font-mono tracking-[0.3em] placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 />
               </div>
+
+              {/* The server only remembers a device after an authenticator code, not a backup code */}
+              {!useBackupCode && (
+                <label
+                  htmlFor="trust-device-checkbox"
+                  className="flex items-start gap-3 mb-6 text-sm text-slate-300 cursor-pointer select-none"
+                >
+                  <input
+                    id="trust-device-checkbox"
+                    type="checkbox"
+                    checked={trustDevice}
+                    onChange={(e) => setTrustDevice(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-purple-500/40 bg-slate-950/50 accent-purple-500"
+                  />
+                  <span>
+                    Trust this device for 30 days
+                    <span className="block text-xs text-slate-500">
+                      Skip the code on this device. Only use this on a device you own.
+                    </span>
+                  </span>
+                </label>
+              )}
 
               <button
                 onClick={handleMfaVerify}
@@ -387,11 +460,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }: LoginPageProps
                 </button>
                 <br />
                 <button
-                  onClick={() => {
-                    authService.cancelMfaLogin();
-                    setMfaRequired(false);
-                    setMfaCode("");
-                  }}
+                  onClick={() => returnToLogin()}
                   className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
                 >
                   ← Back to login

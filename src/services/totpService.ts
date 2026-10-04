@@ -38,9 +38,15 @@ export async function verifySetup(code: string, secret: string): Promise<BackupC
 /**
  * Verify TOTP code during login (MFA challenge).
  * Returns the wrapped vault key, which the caller passes to authService.completeMfaLogin.
+ * With `trustDevice` the server remembers this device, so later logins skip the code.
  */
-export async function verifyLogin(code: string, tempToken?: string): Promise<MfaLoginResponse> {
-    const response = await apiClient.post("/auth/totp/verify-login", { code, tempToken });
+export async function verifyLogin(
+    code: string,
+    tempToken?: string,
+    trustDevice = false,
+): Promise<MfaLoginResponse> {
+    // trust_device asks the server to skip this step on this device for 30 days
+    const response = await apiClient.post("/auth/totp/verify-login", { code, tempToken, trust_device: trustDevice });
     return response.data;
 }
 
