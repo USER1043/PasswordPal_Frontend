@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.4.0...passwordpal-v0.5.0) (2026-10-04)
+
+
+### Features
+
+* **recovery:** recover with an Ed25519 signature instead of a replayable fingerprint ([c148aa0](https://github.com/USER1043/PasswordPal_Frontend/commit/c148aa0a6208666fe7e9b77c41ee9907f731b698))
+
+
+### Bug Fixes
+
+* **auth:** unlock the vault after the two-factor step ([2d594aa](https://github.com/USER1043/PasswordPal_Frontend/commit/2d594aa6015f661cbd117f28d298e521fd60e925))
+
 ## [0.4.0](https://github.com/USER1043/PasswordPal_Frontend/compare/passwordpal-v0.3.0...passwordpal-v0.4.0) (2026-10-03)
 
 
