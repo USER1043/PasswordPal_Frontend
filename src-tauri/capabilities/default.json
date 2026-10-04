@@ -14,6 +14,9 @@
           "url": "https://passwordpal-backend.onrender.com/*"
         },
         {
+          "url": "https://passwordpal-backend-uh7a.onrender.com/*"
+        },
+        {
           "url": "http://localhost:3000/*"
         }
       ]
