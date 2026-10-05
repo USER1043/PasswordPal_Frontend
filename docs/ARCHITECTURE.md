@@ -22,7 +22,7 @@ flowchart LR
 ## Why the split
 
 - **Keys stay in Rust.** The unlocked vault key lives in `VaultState` (`src-tauri/src/state.rs`) as a `Zeroizing` buffer. The UI never sees it. Encryption and decryption happen in Rust and only plaintext entries cross the IPC boundary, on demand.
-- **No browser CORS.** Requests go through `@tauri-apps/plugin-http`: a thin JavaScript wrapper that hands each request over IPC to `tauri-plugin-http`, registered in `src-tauri/src/lib.rs` and run by Rust. It lives in the same process as our core but is separate from it: it only forwards requests (ciphertext, the derived `auth_hash`, cookies) and has no access to `VaultState` or any key. A capability restricts it to a single host: the backend URL given at build time (see [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)).
+- **No browser CORS.** Requests go through `@tauri-apps/plugin-http`: a thin JavaScript wrapper that hands each request over IPC to `tauri-plugin-http`, registered in `src-tauri/src/lib.rs` and run by Rust. It lives in the same process as our core but is separate from it: it only forwards requests (ciphertext, the derived `auth_hash`, cookies) and has no access to `VaultState` or any key. A capability restricts it to a single host: the backend URL given at build time (see [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)). This limits the plugin only. Stopping the webview's own `fetch` calls needs a Content Security Policy (`connect-src`), which is not configured yet (see [ROADMAP.md](ROADMAP.md)).
 - **Offline by default.** Entries are written to local SQLite first; sync is a background step.
 
 ## React side (`src/`)

@@ -27,7 +27,7 @@ Out of scope: attacks that need malware or full control of an unlocked device, p
 - The master password is processed in Rust and never sent anywhere. Keys come from Argon2id (64 MiB, 3 passes, 4 lanes) and BLAKE3 domain-separated derivation; the vault key is wrapped with AES-256-GCM.
 - Entries are encrypted before they are stored locally or sent to the server. The server only sees ciphertext.
 - The unlocked key lives only in Rust memory (`Zeroizing`) and is wiped on lock, logout and after 15 minutes of inactivity.
-- The app can call exactly one host, the backend URL fixed at build time.
+- Requests made through Tauri's HTTP plugin can reach exactly one host, the backend URL fixed at build time. This does not yet restrict the webview's own network access, because no Content Security Policy is set (see the limitations below).
 - Recovery uses an Ed25519 signature over a one-time server challenge; the recovery key never leaves the device.
 - Passwords copied to the clipboard are cleared after 30 seconds.
 

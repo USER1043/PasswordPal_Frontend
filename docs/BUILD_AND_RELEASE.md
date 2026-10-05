@@ -6,7 +6,7 @@ The app has one build-time setting.
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `VITE_BACKEND_URL` | `http://localhost:3000` | Backend base URL for the UI **and** the only host the app may call |
+| `VITE_BACKEND_URL` | `http://localhost:3000` | Backend base URL for the UI **and** the only host the HTTP plugin may call |
 
 It is read from the process environment, then `.env.local`, then `.env` (the same order Vite uses). See `.env.example`. `.env`, `.env.local` and other `*.local` files are git-ignored; never commit real values.
 

@@ -54,7 +54,7 @@ The backend URL is injected at build time, never hard-coded:
 VITE_BACKEND_URL=https://your-backend.example.com npm run tauri build
 ```
 
-One variable does two jobs: it is the API base URL for the UI, and `src-tauri/build.rs` turns it into the only host the app is allowed to call (`src-tauri/capabilities/backend-url.json`, generated and git-ignored). Changing it needs a rebuild. Details are in [docs/BUILD_AND_RELEASE.md](docs/BUILD_AND_RELEASE.md).
+One variable does two jobs: it is the API base URL for the UI, and `src-tauri/build.rs` turns it into the only host the HTTP plugin is allowed to call (`src-tauri/capabilities/backend-url.json`, generated and git-ignored). Changing it needs a rebuild. Details are in [docs/BUILD_AND_RELEASE.md](docs/BUILD_AND_RELEASE.md).
 
 ### Build
 
