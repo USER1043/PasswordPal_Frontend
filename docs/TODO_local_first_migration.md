@@ -1,5 +1,7 @@
 # TODO: Local-First Migration Plan
 
+> **Status:** partly done. Local writes already go to SQLite first and sync runs in the background, but `fetchVault()` still syncs and downloads before reading, and `encrypt_entry`/`decrypt_entry` are still exposed. See [ROADMAP.md](ROADMAP.md) for the related open items.
+
 This document outlines the architectural plan for migrating PasswordPal to a **Local-First (Offline-First)** model on a future dedicated branch.
 
 ---
