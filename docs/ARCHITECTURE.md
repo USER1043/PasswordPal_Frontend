@@ -111,7 +111,7 @@ sequenceDiagram
         else 409 version conflict
             UI->>UI: show ConflictResolver, user picks local or server
         else network error
-            UI->>UI: stop; retry on next change or reconnect
+            UI->>UI: stop and retry on the next change or reconnect
         end
     end
 ```
