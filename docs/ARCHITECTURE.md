@@ -1,22 +1,28 @@
 # Architecture
 
-PasswordPal is a Tauri v2 desktop app. A React/TypeScript UI runs in the system webview; a Rust core holds the keys, does all cryptography and owns the local database. They talk through Tauri commands (IPC). The UI talks to the [backend](https://github.com/USER1043/PasswordPal_Backend) over HTTPS using Tauri's native HTTP client.
+PasswordPal is a Tauri v2 desktop app. A React/TypeScript UI runs in the system webview; a Rust core holds the keys, does all cryptography and owns the local database. They talk through Tauri commands (IPC). The UI reaches the [backend](https://github.com/USER1043/PasswordPal_Backend) over HTTPS through Tauri's HTTP plugin: the UI calls it from JavaScript, but the request is made by Rust, in the same native process as the core. The plugin is generic Tauri code, separate from our core, and never touches keys.
 
 ```mermaid
 flowchart LR
     subgraph Device
-        UI["React UI<br/>pages, services"] -- "invoke (IPC)" --> Core["Rust core<br/>crypto, state, db"]
-        Core --- DB[("SQLite<br/>passwordpal.db")]
-        UI -- "Tauri HTTP plugin" --> Net(("network"))
+        UI["React UI<br/>pages, services"]
+        subgraph Native["Rust process (src-tauri)"]
+            Core["Our core<br/>crypto, state, db"]
+            HTTP["tauri-plugin-http<br/>allowed host only"]
+        end
+        DB[("SQLite<br/>passwordpal.db")]
+        UI -- "invoke (IPC)" --> Core
+        UI -- "plugin-http fetch (IPC)" --> HTTP
+        Core --- DB
     end
-    Net --> API["Backend API"]
+    HTTP --> API["Backend API"]
     API --> SB[("Supabase")]
 ```
 
 ## Why the split
 
 - **Keys stay in Rust.** The unlocked vault key lives in `VaultState` (`src-tauri/src/state.rs`) as a `Zeroizing` buffer. The UI never sees it. Encryption and decryption happen in Rust and only plaintext entries cross the IPC boundary, on demand.
-- **No browser CORS.** Requests go through `@tauri-apps/plugin-http`, which runs in Rust. A capability restricts it to a single host: the backend URL given at build time (see [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)).
+- **No browser CORS.** Requests go through `@tauri-apps/plugin-http`: a thin JavaScript wrapper that hands each request over IPC to `tauri-plugin-http`, registered in `src-tauri/src/lib.rs` and run by Rust. It lives in the same process as our core but is separate from it: it only forwards requests (ciphertext, the derived `auth_hash`, cookies) and has no access to `VaultState` or any key. A capability restricts it to a single host: the backend URL given at build time (see [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)).
 - **Offline by default.** Entries are written to local SQLite first; sync is a background step.
 
 ## React side (`src/`)
